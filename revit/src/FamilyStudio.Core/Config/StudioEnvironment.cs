@@ -2,8 +2,8 @@ namespace FamilyStudio.Core.Config;
 
 /// <summary>
 /// Settings read from the environment and .env files. Process environment variables win, then a
-/// .env file beside the plugin, then %APPDATA%\FamilyStudio\.env. Nothing here is ever written
-/// to logs; the OpenRouter key in particular is only exposed as "configured" or "not configured".
+/// .env file beside the plugin, then %APPDATA%\FamilyStudio\.env. There are no secrets here: the
+/// ChatGPT sign-in lives in the Codex home, managed by Codex.
 /// </summary>
 public sealed class StudioEnvironment
 {
@@ -11,7 +11,6 @@ public sealed class StudioEnvironment
     public const string CodexPathKey = "OPENAI_CODEX_PATH";
     public const string ModelKey = "OPENAI_CODEX_MODEL";
     public const string EffortKey = "OPENAI_CODEX_REASONING_EFFORT";
-    public const string OpenRouterKeyKey = "OPENROUTER_API_KEY";
     public const string OutputKey = "FAMILY_STUDIO_OUTPUT_DIR";
     public const string TemplateKey = "FAMILY_STUDIO_FURNITURE_TEMPLATE";
 
@@ -42,7 +41,7 @@ public sealed class StudioEnvironment
             foreach (var (key, value) in EnvFile.Read(file)) values[key] = value;
             loaded.Insert(0, file);
         }
-        foreach (var key in new[] { CodexHomeKey, CodexPathKey, ModelKey, EffortKey, OpenRouterKeyKey, OutputKey, TemplateKey })
+        foreach (var key in new[] { CodexHomeKey, CodexPathKey, ModelKey, EffortKey, OutputKey, TemplateKey })
             if (Environment.GetEnvironmentVariable(key) is { Length: > 0 } fromProcess) values[key] = fromProcess;
         return new StudioEnvironment(values, loaded);
     }
@@ -84,9 +83,4 @@ public sealed class StudioEnvironment
 
     /// <summary>Codex runs here: an empty folder, so no project instructions or skills are picked up.</summary>
     public string CodexWorkingDirectory => AppData("codex-workspace");
-
-    public bool HasOpenRouterKey => Get(OpenRouterKeyKey) is not null;
-
-    /// <summary>Reserved for OpenRouter-backed features. Never log or display this value.</summary>
-    public string? OpenRouterApiKey => Get(OpenRouterKeyKey);
 }

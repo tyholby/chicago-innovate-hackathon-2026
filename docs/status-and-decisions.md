@@ -68,9 +68,8 @@ preview room document, and everything in the checklist in [revit-integration.md]
 | Decision | Why |
 | --- | --- |
 | The AI runs only on the user's ChatGPT plan, through `codex app-server` | No API keys to buy or leak; Codex handles sign-in and token refresh |
-| No other model providers | One provider keeps the pipeline and its prompts simple |
+| No other model providers or API keys | One provider keeps the pipeline, its prompts and its settings simple |
 | No pasteable ChatGPT credential | The only token login in the protocol is marked internal to OpenAI |
-| `OPENROUTER_API_KEY` is reserved | The settings slot and a key check exist; nothing is sent to OpenRouter yet |
 | Family Studio has its own Codex home by default | A personal Codex setup (MCP servers, skills, config) never leaks into the plug-in; reusing it is opt-in with `OPENAI_CODEX_HOME` |
 | Two Codex processes, and only known feature flags | Reasoning stages cannot generate images; unknown flags stop Codex from starting; image generation needs code mode |
 | Scope: one item, or a collection of seven | Matches the two flows in the window; the limits live in `StudioLimits` |

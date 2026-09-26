@@ -17,7 +17,7 @@ public class EnvFileTests
             OPENAI_CODEX_HOME=C:\Users\me\.codex
             export OPENAI_CODEX_MODEL = "gpt-6-astra"
             OPENAI_CODEX_REASONING_EFFORT=high # trailing comment
-            OPENROUTER_API_KEY=
+            FAMILY_STUDIO_OUTPUT_DIR=
             QUOTED='a # not a comment'
             not a line
             """);
@@ -25,7 +25,7 @@ public class EnvFileTests
         Assert.Equal("gpt-6-astra", values["openai_codex_model"]);
         Assert.Equal("high", values["OPENAI_CODEX_REASONING_EFFORT"]);
         Assert.Equal("a # not a comment", values["QUOTED"]);
-        Assert.False(values.ContainsKey("OPENROUTER_API_KEY"), "blank template values are skipped");
+        Assert.False(values.ContainsKey("FAMILY_STUDIO_OUTPUT_DIR"), "blank template values are skipped");
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class EnvFileTests
         var env = StudioEnvironment.FromValues(new Dictionary<string, string>());
         Assert.True(env.UsesOwnCodexHome);
         Assert.EndsWith(Path.Combine("FamilyStudio", "codex-home"), env.CodexHome);
-        Assert.False(env.HasOpenRouterKey);
+        Assert.EndsWith(Path.Combine("FamilyStudio", "sessions"), env.OutputRoot);
     }
 }
 

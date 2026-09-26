@@ -68,9 +68,9 @@ Your descriptions, photos and the preview-room views are sent to OpenAI, through
 ChatGPT account. Everything Family Studio produces stays on this computer, in a session folder under
 `%LOCALAPPDATA%\FamilyStudio\sessions`: the brief, the reference image, every family revision (.rfa),
 the preview room (.rvt), view captures and an `events.jsonl` log. **Open session folder** in the
-settings menu goes straight there. Nothing is ever sent to OpenRouter.
+settings menu goes straight there.
 
-## Settings and credentials
+## Settings
 
 All settings live in `revit/.env` (copied next to the add-in at build time) or
 `%APPDATA%\FamilyStudio\.env`. See [.env.example](.env.example) for every key.
@@ -81,7 +81,6 @@ All settings live in `revit/.env` (copied next to the add-in at build time) or
 - `OPENAI_CODEX_PATH` points at `codex.exe` if it is somewhere unusual.
 - `OPENAI_CODEX_MODEL` and `OPENAI_CODEX_REASONING_EFFORT` choose the defaults; the settings menu
   (click your account name) lists every model your plan offers.
-- `OPENROUTER_API_KEY` is reserved for features in development. The settings menu can check that it works.
 
 ## How it works
 

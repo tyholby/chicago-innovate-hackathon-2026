@@ -2,8 +2,8 @@
 
 A Rhino 8 plug-in scaffold. For now it does one thing: the `FamilyStudio` command opens a docked
 **hello-world panel** drawn in the Family Studio design language (Paper in light mode, Night
-drafting in dark mode), with a title block that shows whether the `.env` file, the ChatGPT sign-in
-and the OpenRouter key are in place.
+drafting in dark mode), with a title block that shows whether the `.env` file and the ChatGPT
+sign-in are in place.
 
 ## Requirements
 

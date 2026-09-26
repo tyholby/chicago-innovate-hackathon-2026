@@ -15,14 +15,13 @@ using FamilyStudio.Probe;
 //   single "<description>"          Brief, reference image and geometry for one item
 //        [--photo file] [--size 650x700x850] [--unit mm|in] [--name text] [--materials "a;b"]
 //   collection <preset>             The same for a seven-item collection, plus layout
-//   openrouter                      Check the OpenRouter key from the .env file
 //
 // Common options: --env <file>  --model <id>  --effort <level>  --fidelity concept|refined
 
 var options = Options.Parse(args);
 if (options.Command is null or "help" or "--help")
 {
-    Console.WriteLine("usage: familystudio-probe status | signin [--device] | signout | single \"<description>\" [options] | collection <preset> | openrouter");
+    Console.WriteLine("usage: familystudio-probe status | signin [--device] | signout | single \"<description>\" [options] | collection <preset>");
     Console.WriteLine("presets: " + string.Join(", ", Presets.All.Where(p => p.Id != Presets.SingleId).Select(p => p.Id)));
     return 1;
 }
@@ -30,14 +29,6 @@ if (options.Command is null or "help" or "--help")
 var environment = options.Get("env") is string envFile
     ? StudioEnvironment.FromValues(EnvFile.Read(envFile).Concat(ProcessOverrides()).GroupBy(p => p.Key, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Last().Value, StringComparer.OrdinalIgnoreCase))
     : StudioEnvironment.Load(AppContext.BaseDirectory);
-
-if (options.Command == "openrouter")
-{
-    if (environment.OpenRouterApiKey is not string key) { Console.WriteLine("OPENROUTER_API_KEY is not set."); return 2; }
-    var info = await OpenRouterKey.CheckAsync(key, CancellationToken.None);
-    Console.WriteLine(info.Valid ? $"OpenRouter key works. {info.Summary}" : $"OpenRouter rejected the key: {info.Summary}");
-    return info.Valid ? 0 : 2;
-}
 
 using var codex = new CodexService(new CodexOptions(environment.CodexHome, environment.CodexPath, environment.CodexWorkingDirectory, "0.1.0-probe"));
 using var cancel = new CancellationTokenSource();
@@ -53,7 +44,6 @@ switch (options.Command)
     case "status":
         foreach (var m in codex.Models)
             Console.WriteLine($"  {(m.IsDefault ? "*" : " ")} {m.Id,-22} effort {m.DefaultEffort,-7} [{string.Join(", ", m.Efforts)}]");
-        Console.WriteLine($"OpenRouter   {(environment.HasOpenRouterKey ? "key configured" : "no key")}");
         return 0;
 
     case "signin":

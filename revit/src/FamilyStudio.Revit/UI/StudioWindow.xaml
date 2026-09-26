@@ -700,12 +700,6 @@
                         <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding CodexLabel}"/>
                         <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding CodexHomeLabel}" Margin="0,4,0,0"/>
 
-                        <ui:Caps Style="{StaticResource Section}" Label="OpenRouter"/>
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Quiet}" Content="Check key" Command="{Binding CheckOpenRouterCommand}" Margin="12,0,0,0"/>
-                            <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding OpenRouterLabel}"/>
-                        </DockPanel>
-
                         <ui:Caps Style="{StaticResource Section}" Label="Environment file"/>
                         <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding EnvLabel}"/>
 

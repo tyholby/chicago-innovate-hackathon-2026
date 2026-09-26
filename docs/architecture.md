@@ -133,5 +133,5 @@ The view model's primary button follows the session, not the state name: sign in
 
 `StudioEnvironment` resolves each key from, in order: the process environment, `.env` beside the add-in
 DLL (the build copies `revit/.env` there), then `%APPDATA%\FamilyStudio\.env`. Keys and defaults are in
-[`revit/.env.example`](../revit/.env.example). Values are never logged; the OpenRouter key is only
-reported as present or absent.
+[`revit/.env.example`](../revit/.env.example). None of them is a secret: the ChatGPT sign-in lives in
+the Codex home, managed by Codex.

@@ -16,7 +16,6 @@ namespace FamilyStudio.Rhino
         public string? LoadedFile { get; private set; }
         public string CodexHome { get; private set; } = "";
         public bool ChatGptSignedIn { get; private set; }
-        public bool HasOpenRouterKey { get; private set; }
 
         public static EnvStatus Load()
         {
@@ -56,7 +55,6 @@ namespace FamilyStudio.Rhino
                 ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FamilyStudio", "codex-home")
                 : Environment.ExpandEnvironmentVariables(home);
             status.ChatGptSignedIn = File.Exists(Path.Combine(status.CodexHome, "auth.json"));
-            status.HasOpenRouterKey = Get("OPENROUTER_API_KEY") is not null;
             return status;
         }
     }

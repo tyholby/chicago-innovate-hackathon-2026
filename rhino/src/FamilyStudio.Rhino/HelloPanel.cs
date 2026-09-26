@@ -9,7 +9,7 @@ namespace FamilyStudio.Rhino
 {
     /// <summary>
     /// The Family Studio panel. For now: a hello-world cover sheet with a title block that shows
-    /// whether the .env file, the ChatGPT sign-in and the OpenRouter key are in place. Everything is
+    /// whether the .env file and the ChatGPT sign-in are in place. Everything is
     /// drawn on one canvas, so it looks the same in Rhino for Windows and for Mac, light or dark.
     /// Rhino needs the Guid attribute and a public parameterless constructor to host the panel.
     /// </summary>
@@ -69,7 +69,7 @@ namespace FamilyStudio.Rhino
                 "Family Studio for Rhino is in development. The Revit plug-in already turns a description or a product photo into a native family; this panel is where the Rhino version will live.");
 
             // Construction linework: an isometric box on a dimension string, drawn in non-photo blue.
-            var titleBlockTop = height - 150;
+            var titleBlockTop = height - 124;
             var art = Math.Min(inner * 0.62f, Math.Max(0, titleBlockTop - y - 40));
             if (art > 60) Isometric(g, margin + (inner - art) / 2, y + 20, art);
 
@@ -87,7 +87,6 @@ namespace FamilyStudio.Rhino
             var row = titleBlockTop + 60;
             Status(g, margin, row, inner, ".env file", _env.LoadedFile is null ? "Not found. Using defaults." : "Loaded", _env.LoadedFile is not null);
             Status(g, margin, row + 26, inner, "ChatGPT sign-in", _env.ChatGptSignedIn ? "Signed in (shared with Revit)" : "Not signed in yet", _env.ChatGptSignedIn);
-            Status(g, margin, row + 52, inner, "OpenRouter", _env.HasOpenRouterKey ? "Key configured" : "No key", _env.HasOpenRouterKey);
         }
 
         private void Cell(Graphics g, float x, float y, string label, string value, Color color, bool mono)

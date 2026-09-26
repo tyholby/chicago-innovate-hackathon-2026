@@ -24,15 +24,15 @@ This is a monorepo with one folder per host application:
 3. Rhino: in `rhino/`, run `.\scripts\run.ps1`, then the command `FamilyStudio`.
    See [rhino/README.md](rhino/README.md).
 
-## Settings and credentials
+## Settings
 
-Each folder has a `.env.example`. Copy it to `.env` in the same folder; `.env` files are ignored by
-git and never committed.
+There is no API key to paste. You sign in with ChatGPT from the plugin window, and Codex keeps the
+sign-in refreshed in `%LOCALAPPDATA%\FamilyStudio\codex-home`. Set `OPENAI_CODEX_HOME` to reuse another
+Codex sign-in, such as `%USERPROFILE%\.codex`.
 
-- **OpenAI (ChatGPT through Codex).** Nothing to paste: sign in from the plugin window and Codex keeps
-  the sign-in refreshed in `%LOCALAPPDATA%\FamilyStudio\codex-home`. Set `OPENAI_CODEX_HOME` to reuse
-  another Codex sign-in, such as `%USERPROFILE%\.codex`.
-- **OpenRouter.** `OPENROUTER_API_KEY` is read by both plugins and reserved for features in development.
+Each folder has a `.env.example` for the optional settings (where Codex is, the default model, where
+files go). Copy it to `.env` in the same folder to change a default; `.env` files are ignored by git and
+never committed.
 
 ## License
 

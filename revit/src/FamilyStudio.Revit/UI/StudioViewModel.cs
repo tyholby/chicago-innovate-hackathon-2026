@@ -83,7 +83,6 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         ShowRoomCommand = new Command(() => _ = Guard(() => _session.ShowRoomAsync()), () => !IsBusy && _session.Snapshot is not null);
         SelectViewCommand = new Command<string>(v => PreviewView = v);
         OpenOutputsCommand = new Command(() => OpenFolder(_session.Journal.DirectoryPath));
-        CheckOpenRouterCommand = new Command(() => _ = CheckOpenRouterAsync(), () => _environment.HasOpenRouterKey);
         ToggleSettingsCommand = new Command(() => IsSettingsOpen = !IsSettingsOpen);
         DismissAlertCommand = new Command(() => Alert = null);
 
@@ -118,14 +117,10 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
     public string CodexHomeLabel => _environment.UsesOwnCodexHome ? $"Family Studio's own sign-in folder: {_codex.CodexHome}" : _codex.CodexHome;
     public string EnvLabel => _environment.LoadedFiles.Count == 0 ? "No .env file found. Defaults are in use." : string.Join("\n", _environment.LoadedFiles);
 
-    private string _openRouterLabel = "";
-    public string OpenRouterLabel { get => _openRouterLabel; private set => Set(ref _openRouterLabel, value); }
-
     public async Task StartAsync()
     {
         Connection = Connection.Starting;
         ConnectionMessage = "Connecting to Codex...";
-        OpenRouterLabel = _environment.HasOpenRouterKey ? "Key found in .env. Not used by Family Studio yet." : "No OPENROUTER_API_KEY in .env.";
         try
         {
             await _codex.ConnectAsync(_lifetime.Token);
@@ -207,18 +202,6 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         await Guard(() => _codex.SignOutAsync(_lifetime.Token));
         Connection = Connection.SignedOut;
         ConnectionMessage = "Signed out. Sign in with ChatGPT to continue.";
-    }
-
-    private async Task CheckOpenRouterAsync()
-    {
-        if (_environment.OpenRouterApiKey is not string key) return;
-        OpenRouterLabel = "Checking the key...";
-        try
-        {
-            var info = await OpenRouterKey.CheckAsync(key, _lifetime.Token);
-            OpenRouterLabel = info.Valid ? $"Key works. {info.Summary}" : $"Key rejected: {info.Summary}";
-        }
-        catch (Exception ex) { OpenRouterLabel = $"Could not reach OpenRouter: {ex.Message}"; }
     }
 
     // ---- model settings --------------------------------------------------------------------
@@ -872,7 +855,6 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
     public ICommand ShowRoomCommand { get; }
     public ICommand SelectViewCommand { get; }
     public ICommand OpenOutputsCommand { get; }
-    public ICommand CheckOpenRouterCommand { get; }
     public ICommand ToggleSettingsCommand { get; }
     public ICommand DismissAlertCommand { get; }
 
