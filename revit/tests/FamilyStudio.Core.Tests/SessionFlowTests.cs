@@ -16,29 +16,54 @@ public class SessionFlowTests : IDisposable
         try { Directory.Delete(_folder, recursive: true); } catch (IOException) { }
     }
 
-    /// <summary>Answers each stage from a script keyed by stage name, recording every request.</summary>
+    /// <summary>
+    /// Answers each stage from a script keyed by stage name, recording every request. Stages may run
+    /// at once (a collection plans in parallel), so it is thread-safe and records the most seen at once.
+    /// </summary>
     private sealed class ScriptedAgent(string folder) : IStudioAgent
     {
         public readonly List<StageRequest> Requests = new();
         public readonly Dictionary<string, Queue<Func<StageRequest, string>>> Script = new();
         public Func<CancellationToken, Task>? BeforeEachStage;
-        public event Action<string>? Progress { add { } remove { } }
+        public Action<StageRequest>? DuringStage;
+        public TimeSpan RecipeDelay;
+        public int MaxRunning;
+        private int _running;
+        public event Action<StageProgress>? Progress;
+
+        public void Report(StageProgress progress) => Progress?.Invoke(progress);
 
         public async Task<StageResult> RunAsync(StageRequest request, CancellationToken cancellationToken)
         {
-            Requests.Add(request);
-            if (BeforeEachStage is not null) await BeforeEachStage(cancellationToken);
-            if (request.Kind == StageKind.Image)
+            int count;
+            lock (Requests)
             {
-                var path = Path.Combine(folder, $"generated-{Requests.Count}.png");
-                var png = new byte[64];
-                new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, (byte)'I', (byte)'H', (byte)'D', (byte)'R', 0, 0, 0x06, 0, 0, 0, 0x04, 0 }.CopyTo(png, 0);
-                Directory.CreateDirectory(folder);
-                await File.WriteAllBytesAsync(path, png, cancellationToken);
-                return new StageResult("img", "", new GeneratedImage("item-1", path, null), null, "test-model", TimeSpan.Zero);
+                Requests.Add(request);
+                count = Requests.Count;
+                MaxRunning = Math.Max(MaxRunning, ++_running);
             }
-            var answer = Script[request.Name].Dequeue()(request);
-            return new StageResult($"s{Requests.Count}", answer, null, null, "test-model", TimeSpan.Zero);
+            try
+            {
+                if (BeforeEachStage is not null) await BeforeEachStage(cancellationToken);
+                if (RecipeDelay > TimeSpan.Zero && request.Name.StartsWith("recipe-", StringComparison.Ordinal)) await Task.Delay(RecipeDelay, cancellationToken);
+                if (request.Kind == StageKind.Image)
+                {
+                    var path = Path.Combine(folder, $"generated-{count}.png");
+                    var png = new byte[64];
+                    new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, (byte)'I', (byte)'H', (byte)'D', (byte)'R', 0, 0, 0x06, 0, 0, 0, 0x04, 0 }.CopyTo(png, 0);
+                    Directory.CreateDirectory(folder);
+                    await File.WriteAllBytesAsync(path, png, cancellationToken);
+                    return new StageResult("img", "", new GeneratedImage("item-1", path, null), null, "test-model", TimeSpan.Zero);
+                }
+                DuringStage?.Invoke(request);
+                Func<StageRequest, string> next;
+                lock (Script) next = Script[request.Name].Dequeue();
+                return new StageResult($"s{count}", next(request), null, null, "test-model", TimeSpan.Zero);
+            }
+            finally
+            {
+                lock (Requests) _running--;
+            }
         }
 
         public void Dispose() { }
@@ -240,6 +265,65 @@ public class SessionFlowTests : IDisposable
     {
         var (session, agent, host) = Create();
         var brief = Samples.CollectionBrief();
+        ScriptCollection(agent, brief);
+
+        var draft = Presets.Create("office");
+        await session.GenerateAsync(draft, Settings);
+        Assert.Equal(StudioState.Review, session.State);
+        session.Accept(draft);
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+
+        Assert.True(session.State == StudioState.Built, $"{session.State}: {session.Status}");
+        var proposal = Assert.Single(host.Applied);
+        Assert.Equal(7, proposal.Recipes.Length);
+        Assert.Equal(brief.Assets.Select(a => a.Id), proposal.Recipes.Select(r => r.AssetId)); // brief order, whatever finished first
+        Assert.Equal(0.75, proposal.Placements.Single(p => p.Key == "a2-1").PositionM.Z, 6);
+    }
+
+    [Fact]
+    public async Task A_collection_plans_its_recipes_in_parallel()
+    {
+        var (session, agent, host) = Create();
+        ScriptCollection(agent, Samples.CollectionBrief());
+        agent.RecipeDelay = TimeSpan.FromMilliseconds(100);
+
+        var draft = Presets.Create("office");
+        await session.GenerateAsync(draft, Settings);
+        session.Accept(draft);
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+
+        Assert.True(session.State == StudioState.Built, $"{session.State}: {session.Status}");
+        Assert.InRange(agent.MaxRunning, 2, StudioSession.MaxParallelPlans);
+        Assert.Equal(7, Assert.Single(host.Applied).Recipes.Length);
+    }
+
+    [Fact]
+    public async Task Stage_progress_shows_on_the_detail_line()
+    {
+        var (session, agent, _) = Create();
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(Samples.StoolBrief()) });
+        agent.Script["recipe-a1"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(new RecipeDraft("a1", Samples.StoolParts())) });
+        string? seen = null;
+        agent.DuringStage = request =>
+        {
+            if (request.Name != "recipe-a1") return;
+            agent.Report(new StageProgress("recipe-a1", "s2", StagePhase.Writing, TimeSpan.FromSeconds(250), 9000, 23));
+            seen = session.Detail;
+            agent.Report(new StageProgress("recipe-a1", "s2", StagePhase.Finished, TimeSpan.FromSeconds(251), 9100, 24));
+        };
+
+        var draft = StoolDraft();
+        await session.GenerateAsync(draft, Settings);
+        session.Accept(draft);
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+
+        Assert.Equal("Writing, 23 parts so far (4:10)", seen);
+        Assert.Equal("shape", agent.Requests.Single(r => r.Name == "recipe-a1").CountKey);
+        Assert.Equal(StudioState.Built, session.State);
+    }
+
+    private static void ScriptCollection(ScriptedAgent agent, StudioBrief brief)
+    {
         agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(brief) });
         agent.Script["recipe-a1"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(new RecipeDraft("a1", Samples.Table(brief).Parts)) });
         for (var i = 2; i <= 7; i++)
@@ -256,16 +340,5 @@ public class SessionFlowTests : IDisposable
                 new PlacementIntent("a2-1", "a2", "surface", Vec3.Zero, 0, "a1-1", "top", null, null, null, null)
             }.Concat(Enumerable.Range(3, 5).Select(i => new PlacementIntent($"a{i}-1", $"a{i}", "absolute", new Vec3(-3.2 + (i - 3) * 1.2, -2.2, 0), 0, null, null, null, null, null, null))).ToArray()))
         });
-
-        var draft = Presets.Create("office");
-        await session.GenerateAsync(draft, Settings);
-        Assert.Equal(StudioState.Review, session.State);
-        session.Accept(draft);
-        await session.BuildAsync(Settings, reviewAfterBuild: false);
-
-        Assert.True(session.State == StudioState.Built, $"{session.State}: {session.Status}");
-        var proposal = Assert.Single(host.Applied);
-        Assert.Equal(7, proposal.Recipes.Length);
-        Assert.Equal(0.75, proposal.Placements.Single(p => p.Key == "a2-1").PositionM.Z, 6);
     }
 }

@@ -108,7 +108,11 @@ public class OutputSchemasTests
         if (schema.TryGetProperty("anyOf", out var anyOf))
         {
             if (value.ValueKind == JsonValueKind.Null) return;
-            schema = anyOf.EnumerateArray().First(s => s.GetProperty("type").GetString() != "null");
+            var options = anyOf.EnumerateArray().Where(s => s.GetProperty("type").GetString() != "null").ToArray();
+            // A part picks its branch by shape; a nullable value has exactly one other branch.
+            schema = value.ValueKind == JsonValueKind.Object && value.TryGetProperty("shape", out var shape)
+                ? options.Single(s => s.GetProperty("properties").GetProperty("shape").GetProperty("enum")[0].GetString() == shape.GetString())
+                : options.Single();
         }
         switch (value.ValueKind)
         {

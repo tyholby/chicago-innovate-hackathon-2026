@@ -92,7 +92,9 @@ process dies, the last lines of its stderr are included in the error.
 
 ## Running a stage
 
-`CodexService.RunAsync(StageRequest)`, one stage at a time:
+`CodexService.RunAsync(StageRequest)`, up to four stages at once (`MaxConcurrentStages`; a collection
+plans its recipes in parallel), each in its own thread. Notifications are routed to their stage by
+`threadId`:
 
 1. `thread/start` with `model`, `cwd`, `config.model_reasoning_effort`, `ephemeral:true`,
    `approvalPolicy:"never"`, `sandbox:"read-only"`, `allowProviderModelFallback:false`,
@@ -107,11 +109,20 @@ process dies, the last lines of its stderr are included in the error.
    - Any tool activity (`commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `webSearch`,
      `imageView`, `collabAgentToolCall`, `subAgentActivity`, or `imageGeneration` in a reasoning stage)
      fails the stage and interrupts the turn. Unknown item types are logged and ignored.
+   - `item/agentMessage/delta` (the answer as it streams: measured for progress) and
+     `item/reasoning/summaryTextDelta` / `textDelta` (the model is thinking).
    - `thread/tokenUsage/updated` (usage totals), `model/rerouted` (logged), `error` (retried by Codex
      when `willRetry`, otherwise fails the stage), `turn/completed` (status and error).
 4. Server-to-client requests: `currentTime/read` is answered, MCP elicitations are declined, and anything
    else (tool calls, approvals, user-input requests) is refused and fails the stage.
 5. `thread/unsubscribe` when done.
+
+**Progress.** Every running stage raises `StageProgress` once a second and at each phase change
+(starting, thinking, writing, drawing, finished): the time so far, the characters streamed, and how often
+the request's `CountKey` has appeared (`"shape"`, once per recipe part; `"key"`, once per placement). The
+session shows it on the detail line ("Writing, 23 parts so far (4:10)"; one entry per item while a
+collection plans in parallel). Reports are never journaled, and an exception in a listener is swallowed,
+because they run on timer and protocol threads.
 
 A deadline or a cancel sends `turn/interrupt` (10 s grace). Errors map to: `usageLimitExceeded` or
 `rateLimitExceeded` to `StudioLimitException` (with the reset time when reported), `unauthorized` to

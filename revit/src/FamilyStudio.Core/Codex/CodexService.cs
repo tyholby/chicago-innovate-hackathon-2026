@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using FamilyStudio.Core.Json;
@@ -33,22 +34,29 @@ public sealed record SignInAttempt(string LoginId, string? BrowserUrl, string? V
 /// <summary>
 /// Family Studio's connection to ChatGPT through the official Codex app-server. It owns sign-in
 /// ("Sign in with ChatGPT", or a device code), the model catalog, and two isolated app-server
-/// processes that run stages: one for reasoning and one that may generate images.
+/// processes that run stages: one for reasoning and one that may generate images. Up to
+/// <see cref="MaxConcurrentStages"/> stages run at once, each in its own Codex thread.
 /// </summary>
 public sealed class CodexService : IStudioAgent
 {
+    /// <summary>Stages that may run at once, so a collection can plan several recipes in parallel.</summary>
+    public const int MaxConcurrentStages = 4;
+
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan NoteDuration = TimeSpan.FromSeconds(10);
 
     private readonly CodexOptions _options;
     private readonly SemaphoreSlim _startGate = new(1, 1);
-    private readonly SemaphoreSlim _stageGate = new(1, 1);
+    private readonly SemaphoreSlim _stageGate = new(MaxConcurrentStages, MaxConcurrentStages);
     private readonly Dictionary<CodexProfile, CodexProcess> _processes = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _signInGate = new();
+    private readonly ConcurrentDictionary<string, ActiveStage> _running = new(StringComparer.Ordinal); // by stage ID
+    private readonly ConcurrentDictionary<string, ActiveStage> _byThread = new(StringComparer.Ordinal); // by Codex thread ID, once known
     private IReadOnlySet<string>? _features;
     private string[] _disabledMcpServers = Array.Empty<string>();
     private PendingSignIn? _signIn;
-    private ActiveStage? _active;
     private bool _disposed;
 
     public CodexExecutable? Executable { get; private set; }
@@ -62,7 +70,7 @@ public sealed class CodexService : IStudioAgent
     /// <summary>Raised when the account, sign-in state or model catalog changes. May fire on any thread.</summary>
     public event Action? StateChanged;
 
-    public event Action<string>? Progress;
+    public event Action<StageProgress>? Progress;
 
     public CodexService(CodexOptions options) => _options = options;
 
@@ -261,8 +269,7 @@ public sealed class CodexService : IStudioAgent
 
     private void OnClosed(CodexProcess process, Exception error)
     {
-        var stage = _active;
-        if (stage is not null && ReferenceEquals(stage.Process, process))
+        foreach (var stage in _running.Values.Where(s => ReferenceEquals(s.Process, process)))
             stage.Fail(new IOException("The connection to Codex closed unexpectedly. Try again.", error));
     }
 
@@ -285,6 +292,16 @@ public sealed class CodexService : IStudioAgent
         public StageUsage? Usage;
         public Exception? Failure;
 
+        // Live progress, guarded by Gate like everything above.
+        public readonly Stopwatch Clock = Stopwatch.StartNew();
+        public StagePhase Phase = StagePhase.Starting;
+        public int Written;
+        public int Counted;
+        public string Tail = "";
+        public string? Note;
+        public TimeSpan NoteUntil;
+        public bool Done;
+
         public void Fail(Exception error)
         {
             lock (Gate) Failure ??= error;
@@ -303,8 +320,10 @@ public sealed class CodexService : IStudioAgent
             if (Account is null && await RefreshAccountAsync(cancellationToken).ConfigureAwait(false) is null)
                 throw new StudioSignInRequiredException("Sign in with ChatGPT to use Family Studio.");
             var process = await EnsureProcessAsync(request.Kind == StageKind.Image ? CodexProfile.Image : CodexProfile.Reasoning, cancellationToken).ConfigureAwait(false);
-            stage = new ActiveStage(request, process);
-            _active = stage;
+            var active = stage = new ActiveStage(request, process);
+            _running[active.Id] = active;
+            using var ticker = new Timer(_ => Report(active), null, ProgressInterval, ProgressInterval);
+            Report(active);
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
             deadline.CancelAfter(request.Timeout);
             Journal?.Write("stage_started", new { stageId = stage.Id, request.Name, kind = request.Kind.ToString(), request.Model, images = request.Images.Count });
@@ -329,6 +348,7 @@ public sealed class CodexService : IStudioAgent
                     stage.ThreadId = thread.Opt("thread")?.Str("id") ?? throw new StudioProtocolException("Codex did not start a thread.");
                     stage.ActualModel = thread.Str("model");
                 }
+                _byThread[stage.ThreadId] = stage; // from here on its notifications reach it
 
                 var input = new List<object> { new { type = "text", text = request.Prompt, text_elements = Array.Empty<object>() } };
                 input.AddRange(request.Images.Select(path => (object)new { type = "localImage", path }));
@@ -390,7 +410,14 @@ public sealed class CodexService : IStudioAgent
             {
                 Journal?.Write("stage_finished", new { stageId = stage.Id, request.Name, outcome, elapsedMs = watch.ElapsedMilliseconds,
                     stage.ActualModel, usage = stage.Usage });
-                _active = null;
+                lock (stage.Gate)
+                {
+                    // Under the gate, so no ticker report can follow this last one.
+                    stage.Done = true;
+                    Emit(new StageProgress(request.Name, stage.Id, StagePhase.Finished, stage.Clock.Elapsed, stage.Written, stage.Counted));
+                }
+                _running.TryRemove(stage.Id, out _);
+                if (stage.ThreadId is not null) _byThread.TryRemove(stage.ThreadId, out _);
                 if (stage.ThreadId is not null && stage.Process.IsAlive)
                 {
                     using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(3));
@@ -433,11 +460,11 @@ public sealed class CodexService : IStudioAgent
                 return;
         }
 
-        var stage = _active;
-        if (stage is null || !ReferenceEquals(stage.Process, process)) return;
+        // Several stages can run at once, each in its own thread: route by thread ID.
+        if (parameters.Str("threadId") is not string threadId || !_byThread.TryGetValue(threadId, out var stage) ||
+            !ReferenceEquals(stage.Process, process)) return;
         lock (stage.Gate)
         {
-            if (stage.ThreadId is null || parameters.Str("threadId") != stage.ThreadId) return;
             switch (method)
             {
                 case "turn/started":
@@ -447,6 +474,13 @@ public sealed class CodexService : IStudioAgent
                 case "item/completed":
                     OnItem(stage, parameters.Opt("item"), method == "item/completed");
                     break;
+                case "item/agentMessage/delta":
+                    OnAnswerDelta(stage, parameters.Str("delta"));
+                    break;
+                case "item/reasoning/summaryTextDelta":
+                case "item/reasoning/textDelta":
+                    if (stage.Phase == StagePhase.Starting) Report(stage, StagePhase.Thinking);
+                    break;
                 case "thread/tokenUsage/updated":
                     if (parameters.Opt("tokenUsage")?.Opt("total") is JsonElement total)
                         stage.Usage = new StageUsage(total.Long("inputTokens"), total.Long("cachedInputTokens"),
@@ -454,10 +488,10 @@ public sealed class CodexService : IStudioAgent
                     break;
                 case "model/rerouted":
                     Journal?.Write("model_rerouted", parameters);
-                    Progress?.Invoke($"Codex switched this step to {parameters.Str("toModel")}.");
+                    Notify(stage, $"Codex switched this step to {parameters.Str("toModel")}.");
                     break;
                 case "error":
-                    if (parameters.True("willRetry")) Progress?.Invoke("The connection to ChatGPT dropped. Retrying...");
+                    if (parameters.True("willRetry")) Notify(stage, "The connection to ChatGPT dropped. Retrying...");
                     else stage.Fail(MapError(parameters.Opt("error"), "Codex reported an error."));
                     break;
                 case "turn/completed":
@@ -477,16 +511,16 @@ public sealed class CodexService : IStudioAgent
         switch (type)
         {
             case "userMessage" or "reasoning" or "contextCompaction" or "plan" or "hookPrompt":
-                if (!completed && type == "reasoning") Progress?.Invoke("Thinking...");
+                if (!completed && type == "reasoning" && stage.Phase != StagePhase.Writing) Report(stage, StagePhase.Thinking);
                 return;
             case "agentMessage":
-                if (!completed) { Progress?.Invoke("Writing the result..."); return; }
+                if (!completed) { Report(stage, StagePhase.Writing); return; }
                 var text = item.Str("text") ?? "";
                 stage.LastText = text;
                 if (item.Str("phase") is null or "final_answer") stage.FinalText = text;
                 return;
             case "imageGeneration" when stage.Request.Kind == StageKind.Image:
-                if (!completed) { Progress?.Invoke("Drawing the reference image..."); return; }
+                if (!completed) { Report(stage, StagePhase.Drawing); return; }
                 if (item.Opt("failure") is JsonElement failure)
                 {
                     stage.Fail(failure.Str("type") == "usageLimitExceeded"
@@ -513,6 +547,57 @@ public sealed class CodexService : IStudioAgent
         }
     }
 
+    // ---- live progress --------------------------------------------------------------------
+
+    /// <summary>
+    /// Reports a stage's progress. With a phase it reports only a change (the ticker reports the rest,
+    /// once a second), so a long step shows its time, and while writing, how much it has written.
+    /// </summary>
+    private void Report(ActiveStage stage, StagePhase? phase = null)
+    {
+        lock (stage.Gate)
+        {
+            if (stage.Done) return;
+            if (phase is StagePhase next)
+            {
+                if (next == stage.Phase) return;
+                stage.Phase = next;
+            }
+            var note = stage.Note is not null && stage.Clock.Elapsed < stage.NoteUntil ? stage.Note : null;
+            Emit(new StageProgress(stage.Request.Name, stage.Id, stage.Phase, stage.Clock.Elapsed, stage.Written, stage.Counted, note));
+        }
+    }
+
+    /// <summary>Shows a passing message, such as a reconnect, in the stage's progress for a few seconds.</summary>
+    private void Notify(ActiveStage stage, string note)
+    {
+        lock (stage.Gate)
+        {
+            stage.Note = note;
+            stage.NoteUntil = stage.Clock.Elapsed + NoteDuration;
+        }
+        Report(stage);
+    }
+
+    /// <summary>Measures the streamed answer: its length, and how often the request's count key appears (one "shape" per part).</summary>
+    private void OnAnswerDelta(ActiveStage stage, string? delta)
+    {
+        if (string.IsNullOrEmpty(delta)) return;
+        Report(stage, StagePhase.Writing);
+        stage.Written += delta.Length;
+        if (stage.Request.CountKey is not string key) return;
+        var (found, carry) = StreamedKeyCounter.Count(stage.Tail, delta, key);
+        stage.Counted += found;
+        stage.Tail = carry;
+    }
+
+    /// <summary>Progress runs on timer and protocol threads, where an exception would end the host process.</summary>
+    private void Emit(StageProgress progress)
+    {
+        try { Progress?.Invoke(progress); }
+        catch (Exception) { /* progress is best effort */ }
+    }
+
     private Task<object?> OnServerRequestAsync(CodexProcess process, string method, JsonElement parameters)
     {
         switch (method)
@@ -522,8 +607,9 @@ public sealed class CodexService : IStudioAgent
             case "mcpServer/elicitation/request":
                 return Task.FromResult<object?>(new { action = "decline" });
         }
-        var stage = _active;
-        if (stage is not null && ReferenceEquals(stage.Process, process))
+        // Stop the stage that asked, or every stage on this process when the request names no thread.
+        var threadId = parameters.Str("threadId");
+        foreach (var stage in _running.Values.Where(s => ReferenceEquals(s.Process, process) && (threadId is null || s.ThreadId == threadId)))
         {
             Journal?.Write("request_blocked", new { stageId = stage.Id, method });
             stage.Fail(new StudioProtocolException($"Codex asked for something Family Studio does not allow ({method}). The step was stopped."));
@@ -587,5 +673,24 @@ public sealed class CodexService : IStudioAgent
         lock (_signInGate) { pending = _signIn; _signIn = null; }
         pending?.Completion.TrySetResult(new SignInOutcome(false, "Family Studio closed."));
         foreach (var profile in _processes.Keys.ToArray()) StopProcess(profile);
+    }
+}
+
+/// <summary>Counts a JSON key in text that streams in pieces, such as the one "shape" of each recipe part.</summary>
+internal static class StreamedKeyCounter
+{
+    /// <summary>
+    /// Counts <paramref name="key"/> (as a key: quoted and followed by a colon) in <paramref name="piece"/>,
+    /// including one that began in the previous piece. Returns the carry for the next piece: the last few
+    /// characters, too short to hold a whole key, so nothing is counted twice.
+    /// </summary>
+    public static (int Found, string Carry) Count(string carry, string piece, string key)
+    {
+        var needle = "\"" + key + "\":";
+        var text = carry + piece;
+        var found = 0;
+        for (var at = text.IndexOf(needle, StringComparison.Ordinal); at >= 0; at = text.IndexOf(needle, at + needle.Length, StringComparison.Ordinal))
+            found++;
+        return (found, text.Length < needle.Length ? text : text[^(needle.Length - 1)..]);
     }
 }

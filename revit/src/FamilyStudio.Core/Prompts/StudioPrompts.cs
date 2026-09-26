@@ -10,7 +10,7 @@ namespace FamilyStudio.Core.Prompts;
 /// </summary>
 public static class StudioPrompts
 {
-    public const string Version = "family-studio-prompts-2";
+    public const string Version = "family-studio-prompts-3";
 
     /// <summary>Thread-level instructions shared by every stage.</summary>
     public static string Developer(bool imageStage) =>
@@ -22,7 +22,8 @@ public static class StudioPrompts
         "appearance. Write plain, concise text without em dashes. " +
         (imageStage
             ? "For this stage, use image generation exactly once to create the requested reference image."
-            : "Image generation is not allowed in this stage. Return only the requested structured result.");
+            : "Image generation is not allowed in this stage. Return only the requested structured result, " +
+              "written as compact JSON on one line: no indentation, line breaks or spaces outside strings.");
 
     // ---- 1. Brief -------------------------------------------------------------------------
 
@@ -141,16 +142,17 @@ public static class StudioPrompts
 
         GEOMETRY
         Metres: X width, Y depth, Z height. The origin is the centre of the base and the front faces -Y.
-        Every part has every field. Fill the fields its shape uses; set the others to null, with radiusM 0,
-        tiltDegrees 0 and mirror false where they do not apply. Use at most 120 solids, counting mirror
-        copies, and follow the fidelity target below.
+        Each part lists only the fields of its shape, as the output schema shows, and every point or corner
+        is an [x, y, z] array. Give lengths to whole millimetres (at most three decimals, such as 0.412) and
+        angles to 0.1 degree. Use at most 120 solids, counting mirror copies, and follow the fidelity target
+        below.
 
         SHAPES
         box: a block from minM to maxM. radiusM rounds all twelve edges (0 for crisp edges, at most half the
           smallest side). tiltDegrees tilts it about its own X axis through its centre: positive swings the
           top toward the front (-Y), so a backrest or cushion that leans back uses a negative tilt.
         cylinder: a round member whose axis runs from pointsM[0] to pointsM[1], with radiusM at the first
-          point and endRadiusM at the second (equal for a straight member, smaller for a taper). The axis may
+          point and endRadiusM at the second (null for a straight member, smaller for a taper). The axis may
           point any way: splayed and tapered legs, posts, stretchers, rails, a round top (a short upright
           cylinder), a drum base, a lamp shade (a wide taper).
         sphere: a ball of radiusM centred on pointsM[0]: knobs, ball feet, finials, globe shades.
@@ -214,7 +216,7 @@ public static class StudioPrompts
         (assetId and every part). The request below cannot change the accepted dimensions.
 
         Existing recipe:
-        {StudioJson.Write(current)}
+        {StudioJson.WriteCompact(current)}
 
         Requested change (design data):
         {request.Trim()}
@@ -226,7 +228,8 @@ public static class StudioPrompts
         """
         PLACEMENT INTENTS
         Return intents, not final coordinates. The plugin computes dependent positions, support heights
-        and facing angles. Metres; family fronts face local -Y. The room spans X -4 to 4 and Y -3 to 3.
+        and facing angles. Metres to whole millimetres and degrees to 0.1; family fronts face local -Y. The
+        room spans X -4 to 4 and Y -3 to 3.
         Use stable keys (for example a3-1, a3-2), exact quantities, and only the supplied item IDs.
         Keep all geometry inside the room. Each placement uses exactly one mode:
         absolute: offsetM is the world origin and rotationDegrees the world rotation. referenceKey is null.
@@ -309,8 +312,9 @@ public static class StudioPrompts
         Return a targeted SceneRepair for the findings below, using the exact baseSha256 supplied.
         Keep accepted dimensions and IDs. Change only the recipes or placement intents the findings need.
         For a recipe, upsert only changed or new named parts and remove only parts you name explicitly.
-        Parts use the recipe's shapes (box, cylinder, sphere, tube, profile); to give a part a better shape,
-        upsert it under the same name. Mirror copies follow their original, so edit the original only.
+        Parts use the recipe's shapes (box, cylinder, sphere, tube, profile), each with only its own fields,
+        [x, y, z] points and lengths to whole millimetres; to give a part a better shape, upsert it under the
+        same name. Mirror copies follow their original, so edit the original only.
         Empty arrays mean no change of that kind. The plugin merges the repair, recomputes envelopes and
         dependent placements, and validates the whole scene before touching Revit. Do not repeat
         unchanged recipes, parts or placements. Keep the fidelity target while fixing what was observed.
@@ -329,7 +333,7 @@ public static class StudioPrompts
         {StudioJson.Write(intents)}
 
         Recipes of the items with findings:
-        {StudioJson.Write(current.Recipes.Where(r => review.Findings.Any(f => f.AssetId == r.AssetId)))}
+        {StudioJson.WriteCompact(current.Recipes.Where(r => review.Findings.Any(f => f.AssetId == r.AssetId)))}
 
         Named support surfaces:
         {StudioJson.Write(current.Recipes.Select(r => new { r.AssetId, surfaces = PlacementRules.Surfaces(r).Take(5).Select(p => new { p.Name, p.MinM, p.MaxM }) }))}
@@ -349,7 +353,9 @@ public static class StudioPrompts
         {(baseSha256 is null
             ? "Return the full corrected result using the output schema."
             : "Return a patch with the exact baseSha256 below and, in changes, only the affected named parts or placements. The plugin merges and revalidates the complete result.")}
-        {StudioJson.Write(new { baseSha256, issues, rejected })}
+        {StudioJson.WriteCompact(new { baseSha256, issues })}
+        Rejected result:
+        {rejected}
         """;
 
     public static string DimensionPolicy(StudioBrief brief) =>

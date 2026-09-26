@@ -42,16 +42,38 @@ following [local-install.md](local-install.md):
 - **Sign in with ChatGPT** from the window, through the browser, with Family Studio's own Codex home.
 - A complete single item in Revit, on the example chair as the window opens (photo, name, size and
   finishes) at `xhigh` with `gpt-6-astra`: the photo read into a brief (42 s), acceptance, the preview
-  room, a recipe accepted on the first attempt (3.5 minutes), the family (`Walnut Lounge Chair.rfa`), its
+  room, a recipe accepted on the first attempt (3.4 minutes), the family (`Walnut Lounge Chair.rfa`), its
   placement, and the plan and both 3D captures.
+- Curved shapes, once, in Revit (prompts version 2, Refined, `xhigh`), on a photo of a stone relief: the
+  model used every shape (18 cylinders, 18 profiles, 17 tubes, 6 spheres, 1 box; 60 parts), the recipe
+  passed validation on the first attempt and Revit built it. `shape_fallbacks` kept two drapery folds as
+  11 and 9 overlapping solids because Revit could not unite them.
+- `dotnet test` passes (106 tests, run on the .NET 10 runtime); the add-in builds for 2025 and 2026 with
+  zero warnings and for 2027 with the 2 MSB3277 above; the probe and the Rhino plug-in build.
+
+### Performance (2026-09-26)
+
+Profiled from the session logs. Codex writes about 33 tokens a second, steadily, so a stage's time is its
+output tokens: reasoning plus answer. Revit's own work (preview room, build, captures) takes seconds.
+
+| Run | Brief | Recipe | Recipe tokens (reasoning + answer) |
+| --- | --- | --- | --- |
+| Example chair, boxes only, `xhigh` | 42 s | 3.4 min | 4,860 + 1,738 |
+| Stone relief, curved shapes, Refined, `xhigh`, 60 parts | 42 s | 14.7 min | 15,020 + 14,198 |
+
+About a third of that relief answer was field names (every part listed all 15 fields) and 28 percent was
+indentation. Prompts version 3 lists only each shape's fields and asks for compact JSON: rewritten that
+way, the same answer is half the size (35.0k to 17.7k characters). Reasoning at `xhigh` is the other half
+of the time; the effort is a setting (see [codex-integration.md](codex-integration.md)).
 
 ### Not verified yet
 
-- **The curved shapes in Revit.** `ShapeSolids` (rounded boxes, cylinders, spheres, tubes, profiles and
-  their unions) compiles against Revit 2025 to 2027 but has not run inside Revit. Check the session log
-  for `shape_fallbacks` on the first builds.
-- **The model's use of the new shapes.** The prompts and schemas are new (prompts version 2); no live
-  run has used them yet.
+- **Prompts version 3, and parallel planning, live.** Per-shape part fields, `[x, y, z]` points and
+  compact answers pass every offline test but have had no live run: check that answers come back compact
+  (the `<stage>-<id>-output.txt` files) and that validation passes as often as before. A collection's
+  parallel recipes run several Codex threads in one app-server process; confirm that on a first live
+  collection, and watch for rate limits.
+- **The curved shapes in Revit beyond one run** (above): check the session log for `shape_fallbacks`.
 
 - **The rest of the Revit checklist, and anything in Rhino.** In Revit, not yet run: review and repair,
   revise, **Save .rfa**, **Load into project**, collections, the Night theme and closing the preview room
@@ -104,6 +126,9 @@ preview room document, and everything in the checklist in [revit-integration.md]
 | Two Codex processes, and only known feature flags | Reasoning stages cannot generate images; unknown flags stop Codex from starting; image generation needs code mode |
 | Scope: one item, or a collection of seven | Matches the two flows in the window; the limits live in `StudioLimits` |
 | Geometry uses five shapes: boxes with rounded edges, cylinders and tapers on any axis, spheres, tubes and extruded profiles, with mirroring (2026-09-26) | Boxes alone made every item look blocky. Each shape still has exact bounds in code and is built only from extrusions and revolutions, so validation and the measure-back stay exact |
+| A recipe part lists only its shape's fields, points are `[x, y, z]`, and answers are compact JSON with lengths to whole millimetres (prompts version 3) | Output tokens are most of a stage's time; a recorded 60-part answer halves |
+| A collection plans up to four recipes at once, each in its own Codex thread | Seven recipes in a row took seven times one recipe; each is independent until the layout |
+| Every running stage shows live progress on the detail line | A 15-minute step behind a static status looks like a hang |
 | Every design builds in its own preview room | The user's model changes only when they choose **Load into project**, and their families are never overwritten |
 | One family type, named by the accepted size | Rebuilt revisions reload in place without new types |
 | No NuGet packages in the core or the add-in; C# 12 | Revit's shared load context, and identical builds on SDK 8 and 10 |

@@ -70,7 +70,7 @@ in-memory hosts.
 | Thread | Runs | Rules |
 | --- | --- | --- |
 | Revit UI thread (WPF dispatcher) | Window, view model, bindings | The only thread that touches WPF objects and bound collections |
-| Thread pool | Session operations after `ConfigureAwait(false)`, JSON-RPC reads, Codex events | Never touch WPF or Revit objects; raise events and let listeners marshal |
+| Thread pool | Session operations after `ConfigureAwait(false)`, parallel recipe stages, JSON-RPC reads, Codex events, progress ticks | Never touch WPF or Revit objects; raise events and let listeners marshal |
 | Revit API context | `RevitDispatcher.Execute`, one `ExternalEvent` at a time | The only place Revit API calls happen |
 
 `StudioSession.Changed` and `CodexService.StateChanged` can fire on any thread, and inside Revit's own
@@ -99,11 +99,14 @@ any operation --> LimitReached | SignInRequired | TimedOut | Cancelled | Documen
 ```
 
 - One operation at a time (`RunOperation`); `IsBusy` is true while it runs, and `Cancel()` cancels it.
+  Inside a build, a collection plans up to four recipes at once (`MaxParallelPlans`), and `Detail`
+  shows every running stage live (`StageProgressText`).
 - Changing the inputs after a reference was made (before acceptance) calls `InvalidateDraft`, which
   returns to `Draft`. `Accept` refuses if the inputs differ from the ones the reference was made from.
 - Acceptance freezes the brief and hashes it together with the reference image (`AcceptedDesign`); every
   build step verifies the image hash again.
-- A failed or cancelled build keeps finished recipes (`_planned`), so building again resumes.
+- A failed or cancelled build keeps finished recipes (`_planned`, each stored as soon as it validates,
+  even while other items are still planning), so building again resumes.
 - Closing the preview room document moves the session to `DocumentUnavailable`; building again opens a
   fresh room and reuses the validated recipes and layout, so no AI planning runs again.
 

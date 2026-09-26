@@ -29,6 +29,9 @@ public static class StudioJson
 
     public static string Write<T>(T value) => JsonSerializer.Serialize(value, Options);
 
+    /// <summary>One-line JSON for prompts that show the model the form it must write back.</summary>
+    public static string WriteCompact<T>(T value) => JsonSerializer.Serialize(value, Compact);
+
     public static T Read<T>(string json) => JsonSerializer.Deserialize<T>(StripFence(json), Options)
         ?? throw new JsonException("Expected a JSON object.");
 

@@ -35,9 +35,13 @@ public sealed record ActivityEntry(DateTimeOffset Time, string Text, TimeSpan? D
 /// Runs one design from brief to native families: prepare the brief, make or import the reference,
 /// accept, plan each family, arrange a collection, build natively, and optionally review and repair.
 /// One operation runs at a time; each can be cancelled, and completed native work always survives.
+/// Within a build, a collection plans its recipes in parallel.
 /// </summary>
 public sealed class StudioSession : IDisposable
 {
+    /// <summary>Recipes a collection plans at once, each in its own Codex thread.</summary>
+    public const int MaxParallelPlans = Codex.CodexService.MaxConcurrentStages;
+
     private static readonly TimeSpan BriefTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan ReferenceTimeout = TimeSpan.FromMinutes(8);
     private static readonly TimeSpan PlanningTimeout = TimeSpan.FromMinutes(20); // detailed shapes at xhigh effort take longer
@@ -46,7 +50,9 @@ public sealed class StudioSession : IDisposable
     private readonly IStudioAgent _agent;
     private readonly IStudioHost _host;
     private readonly List<ActivityEntry> _activity = new();
-    private readonly Dictionary<string, FamilyRecipe> _planned = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, FamilyRecipe> _planned = new(StringComparer.Ordinal); // written under its own lock while planning in parallel
+    private readonly Dictionary<string, StageProgress> _live = new(StringComparer.Ordinal); // running stages by ID; also guards _stageLabels
+    private readonly Dictionary<string, string> _stageLabels = new(StringComparer.Ordinal); // stage name to item name, for the detail line
     private CancellationTokenSource? _operation;
     private Task _running = Task.CompletedTask;
     private StudioDraft? _generatedFrom;
@@ -223,15 +229,8 @@ public sealed class StudioSession : IDisposable
         Snapshot = await _host.EnsureRoomAsync(token);
         if (Snapshot.Families.Length == 0)
         {
-            for (var i = 0; i < brief.Assets.Length; i++)
-            {
-                var asset = brief.Assets[i];
-                if (_planned.ContainsKey(asset.Id)) continue; // resuming after a cancelled or failed build
-                SetState(StudioState.Building, brief.IsSingleItem
-                    ? $"Designing the geometry of {asset.Name}..."
-                    : $"Designing family {i + 1} of {brief.Assets.Length}: {asset.Name}...");
-                _planned[asset.Id] = await Timed($"{asset.Name}: geometry validated", () => PlanRecipeAsync(brief, asset, design.Reference, settings, token));
-            }
+            // Resuming after a cancelled or failed build plans only the items still missing.
+            await PlanRecipesAsync(brief, brief.Assets.Where(a => !_planned.ContainsKey(a.Id)).ToArray(), design.Reference, settings, token);
 
             var recipes = brief.Assets.Select(a => _planned[a.Id]).ToArray();
             if (IsSingleFreestanding(brief))
@@ -290,7 +289,7 @@ public sealed class StudioSession : IDisposable
         var draft = await Timed("Revision validated", () => CandidateLoop.RunAsync<RecipeDraft>(_agent, Journal,
             new StageRequest("refine-" + asset.Id, StageKind.Reasoning, settings.Model, StudioPrompts.Developer(false),
                 StudioPrompts.Refine(brief, asset, new RecipeDraft(current.AssetId, current.Parts), request, settings.Fidelity),
-                new[] { design.Reference.Path }, OutputSchemas.Recipe(brief, asset), PlanningTimeout),
+                new[] { design.Reference.Path }, OutputSchemas.Recipe(brief, asset), PlanningTimeout, CountKey: "shape"),
             candidate => CheckRecipe(candidate, asset, brief), token,
             OutputSchemas.RecipePatch(brief, asset), RecipeDraft.Merge));
         var recipe = draft.Compile(brief);
@@ -328,12 +327,44 @@ public sealed class StudioSession : IDisposable
 
     // ---- planning helpers -------------------------------------------------------------------
 
+    /// <summary>
+    /// Plans items' recipes, up to <see cref="MaxParallelPlans"/> at once: a collection then takes about as
+    /// long as its slowest items, not all seven in a row. Each recipe is kept the moment it validates, so a
+    /// failure or cancel loses only the items still in progress, and building again resumes from there.
+    /// </summary>
+    private async Task PlanRecipesAsync(StudioBrief brief, AssetBrief[] assets, ReferenceImage reference, StageSettings settings, CancellationToken token)
+    {
+        if (assets.Length == 0) return;
+        var ready = brief.Assets.Length - assets.Length;
+        void Announce() => SetState(StudioState.Building, brief.IsSingleItem
+            ? $"Designing the geometry of {assets[0].Name}..."
+            : assets.Length == 1
+                ? $"Designing {assets[0].Name}..."
+                : $"Designing {assets.Length} families, up to {MaxParallelPlans} at once: {Volatile.Read(ref ready)} of {brief.Assets.Length} ready...");
+        Announce();
+        using var slots = new SemaphoreSlim(MaxParallelPlans);
+        await Task.WhenAll(assets.Select(async asset =>
+        {
+            await slots.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                var recipe = await Timed($"{asset.Name}: geometry validated", () => PlanRecipeAsync(brief, asset, reference, settings, token)).ConfigureAwait(false);
+                lock (_planned) _planned[asset.Id] = recipe;
+                Interlocked.Increment(ref ready);
+                if (assets.Length > 1) Announce();
+            }
+            finally { slots.Release(); }
+        })).ConfigureAwait(false);
+    }
+
     private async Task<FamilyRecipe> PlanRecipeAsync(StudioBrief brief, AssetBrief asset, ReferenceImage reference, StageSettings settings, CancellationToken token)
     {
+        var stage = "recipe-" + asset.Id;
+        lock (_live) _stageLabels[stage] = asset.Name;
         var draft = await CandidateLoop.RunAsync<RecipeDraft>(_agent, Journal,
-            new StageRequest("recipe-" + asset.Id, StageKind.Reasoning, settings.Model, StudioPrompts.Developer(false),
+            new StageRequest(stage, StageKind.Reasoning, settings.Model, StudioPrompts.Developer(false),
                 StudioPrompts.Recipe(brief, asset, settings.Fidelity), new[] { reference.Path },
-                OutputSchemas.Recipe(brief, asset), PlanningTimeout),
+                OutputSchemas.Recipe(brief, asset), PlanningTimeout, CountKey: "shape"),
             candidate => CheckRecipe(candidate, asset, brief), token,
             OutputSchemas.RecipePatch(brief, asset), RecipeDraft.Merge).ConfigureAwait(false);
         return draft.Compile(brief);
@@ -350,7 +381,7 @@ public sealed class StudioSession : IDisposable
     private Task<PlacementIntentPlan> PlanLayoutAsync(StudioBrief brief, FamilyRecipe[] recipes, ReferenceImage reference, StageSettings settings, CancellationToken token) =>
         CandidateLoop.RunAsync<PlacementIntentPlan>(_agent, Journal,
             new StageRequest("layout", StageKind.Reasoning, settings.Model, StudioPrompts.Developer(false),
-                StudioPrompts.Layout(brief, recipes), new[] { reference.Path }, OutputSchemas.Layout(brief), PlanningTimeout),
+                StudioPrompts.Layout(brief, recipes), new[] { reference.Path }, OutputSchemas.Layout(brief), PlanningTimeout, CountKey: "key"),
             candidate =>
             {
                 var placements = new PlacementResolver(candidate, recipes).Resolve();
@@ -463,7 +494,7 @@ public sealed class StudioSession : IDisposable
         var accepted = await CandidateLoop.RunAsync<SceneRepair>(_agent, Journal,
             new StageRequest("repair", StageKind.Reasoning, settings.Model, StudioPrompts.Developer(false),
                 StudioPrompts.Repair(brief, snapshot, review, before, intents, baseHash, settings.Fidelity),
-                new[] { reference.Path }, OutputSchemas.Repair(brief), PlanningTimeout),
+                new[] { reference.Path }, OutputSchemas.Repair(brief), PlanningTimeout, CountKey: "shape"),
             candidate =>
             {
                 var (recipes, merged) = Merge(candidate);
@@ -603,9 +634,22 @@ public sealed class StudioSession : IDisposable
     private static StudioDraft Copy(StudioDraft d) =>
         new(d.Style, d.Assets.ToArray(), d.Materials.ToArray(), d.AssetNames.ToArray(), d.ReferenceImagePath, d.KnownSizeM);
 
-    private void OnProgress(string text)
+    /// <summary>Shows what the running stages are doing, live, on the detail line.</summary>
+    private void OnProgress(StageProgress progress)
     {
-        Detail = text;
+        string detail;
+        lock (_live)
+        {
+            if (progress.Phase == StagePhase.Finished)
+            {
+                // The next state change sets its own detail; until then keep showing any other running stages.
+                if (!_live.Remove(progress.StageId) || _live.Count == 0) return;
+            }
+            else _live[progress.StageId] = progress;
+            detail = StageProgressText.Describe(_live.Values.OrderBy(p => p.StageName, StringComparer.Ordinal).ToArray(),
+                name => _stageLabels.TryGetValue(name, out var label) ? label : null);
+        }
+        Detail = detail;
         Changed?.Invoke();
     }
 

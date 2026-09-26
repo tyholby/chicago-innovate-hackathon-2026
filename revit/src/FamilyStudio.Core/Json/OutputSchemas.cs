@@ -68,28 +68,36 @@ public static class OutputSchemas
         ("assetId", Enum(new[] { asset.Id })),
         ("parts", Array(PartNode(brief, asset))));
 
+    /// <summary>
+    /// One object per shape, holding only that shape's fields (the model writes every field it is given),
+    /// with the field lists of <see cref="RecipePartJsonConverter"/>. Shape comes first, so the model
+    /// decides what a part is before it writes that shape's fields.
+    /// </summary>
     private static JsonObject PartNode(StudioBrief brief, AssetBrief? asset)
     {
         var components = asset?.Components.Select(c => c.Id).ToArray()
             ?? brief.Assets.SelectMany(a => a.Components.Select(c => c.Id)).Distinct(StringComparer.Ordinal).ToArray();
-        // Shape first, so the model decides what a part is before it writes that shape's fields.
-        return Object(
-            ("name", String()),
-            ("shape", Enum(PartShapes.All)),
-            ("materialId", Enum(brief.Materials.Select(m => m.Id))),
-            ("componentId", components.Length == 0 ? Null() : Nullable(Enum(components))),
-            ("isFloorSupport", Boolean()),
-            ("mirror", Boolean()),
-            ("minM", Nullable(Vec3())),
-            ("maxM", Nullable(Vec3())),
-            ("tiltDegrees", Number()),
-            ("radiusM", Number()),
-            ("endRadiusM", Nullable(Number())),
-            ("pointsM", Nullable(Array(Vec3()))),
-            ("plane", Nullable(Enum(ProfilePlanes.All))),
-            ("outlineM", Nullable(Array(Array(Number())))),
-            ("fromM", Nullable(Number())),
-            ("toM", Nullable(Number())));
+        JsonNode Field(string shape, string name) => name switch
+        {
+            "shape" => Enum(new[] { shape }),
+            "name" => String(),
+            "materialId" => Enum(brief.Materials.Select(m => m.Id)),
+            "componentId" => components.Length == 0 ? Null() : Nullable(Enum(components)),
+            "isFloorSupport" or "mirror" => Boolean(),
+            "minM" or "maxM" => Point(),
+            "tiltDegrees" or "radiusM" or "fromM" or "toM" => Number(),
+            "endRadiusM" => Nullable(Number()),
+            "pointsM" => Array(Point()),
+            "plane" => Enum(ProfilePlanes.All),
+            "outlineM" => Array(Array(Number())),
+            _ => throw new InvalidOperationException($"No schema for part field {name}.")
+        };
+        return new JsonObject
+        {
+            ["anyOf"] = new JsonArray(PartShapes.All.Select(shape => (JsonNode?)Object(
+                RecipePartJsonConverter.CommonFields.Concat(RecipePartJsonConverter.ShapeFields[shape])
+                    .Select(name => (name, Field(shape, name))).ToArray())).ToArray())
+        };
     }
 
     private static JsonObject LayoutNode(StudioBrief brief) => Object(("placements", Array(IntentNode(brief))));
@@ -140,6 +148,9 @@ public static class OutputSchemas
     private static JsonObject Nullable(JsonNode schema) => new() { ["anyOf"] = new JsonArray(schema, Null()) };
 
     private static JsonObject Vec3() => Object(("x", Number()), ("y", Number()), ("z", Number()));
+
+    /// <summary>A recipe point or corner: [x, y, z] in metres, shorter to write than an {x, y, z} object.</summary>
+    private static JsonObject Point() => Array(Number());
 
     private static JsonElement Finish(JsonObject schema) => JsonSerializer.SerializeToElement(schema);
 }

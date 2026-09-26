@@ -52,6 +52,11 @@ the centre of its base at Z = 0 and the front faces negative Y. Each part has a 
 | `tube` | `PointsM` (2 to 12 path points), `RadiusM`; rounded joints and ends | Bent metal and bentwood frames, arms, rails, piping |
 | `profile` | `Plane` (front XZ, side YZ, plan XY), `OutlineM` (3 to 32 [u, v] points), `RadiusM` (corner rounding), `FromM`..`ToM` along the remaining axis | Sculpted sides and arms, sled bases, curved shells and backs, shaped tops |
 
+- **JSON form:** a part lists only its own shape's fields, shape first, and every point is an `[x, y, z]`
+  array (`RecipePartJsonConverter`, which also reads the earlier every-field form); the output schema is
+  one object per shape. All structured answers are asked for as compact JSON, recipes with lengths to
+  whole millimetres. Output tokens are most of a stage's time (about 33 a second), and this form halves a
+  recipe: a recorded 60-part answer goes from 35.0k to 17.7k characters.
 - **Tilt sign** (boxes): positive tilt swings the top of a part toward the front (-Y). A backrest leaning
   back uses a negative tilt. Revit's `Transform.CreateRotationAtPoint(XYZ.BasisX, angle, centre)` matches.
 - **Mirror:** `Mirror` adds the part's reflection across X = 0, named "<name> mirrored" (`Shapes.Expand`).
@@ -110,8 +115,10 @@ wrong hash is rejected as stale. An answer that is not valid JSON is asked for a
 
 ## Build, review and repair
 
-1. Each item's recipe is planned in turn (finished recipes survive a cancel and a closed preview room),
-   then a collection gets its layout, then everything is built in Revit in one transaction group
+1. Recipes are planned in parallel, up to four at once (`StudioSession.MaxParallelPlans`), each in its own
+   Codex thread. Each recipe is kept the moment it validates, so finished recipes survive another item's
+   failure, a cancel and a closed preview room, and building again plans only what is missing. Then a
+   collection gets its layout, then everything is built in Revit in one transaction group
    ([revit-integration.md](revit-integration.md)). The built families and the placed instances are
    measured back against the plan.
 2. Optional review: the plan and two 3D views are exported and sent with the reference and the measured

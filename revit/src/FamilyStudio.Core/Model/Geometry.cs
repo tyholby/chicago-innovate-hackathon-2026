@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using FamilyStudio.Core.Json;
 using FamilyStudio.Core.Validation;
 
 namespace FamilyStudio.Core.Model;
@@ -17,9 +18,10 @@ namespace FamilyStudio.Core.Model;
 /// <item><c>profile</c>: an outline in <see cref="Plane"/> (<see cref="OutlineM"/>, corners rounded by
 /// <see cref="RadiusM"/>) extruded along the remaining axis from <see cref="FromM"/> to <see cref="ToM"/>.</item>
 /// </list>
-/// <see cref="Mirror"/> adds the part's mirror image across X = 0. The field order keeps plain boxes
-/// short to write; shapes are described in <see cref="PartShapes"/>.
+/// <see cref="Mirror"/> adds the part's mirror image across X = 0. In JSON a part lists only the fields
+/// of its shape, with [x, y, z] points (<see cref="RecipePartJsonConverter"/>).
 /// </summary>
+[JsonConverter(typeof(RecipePartJsonConverter))]
 public sealed record RecipePart(
     string Name,
     Vec3? MinM,

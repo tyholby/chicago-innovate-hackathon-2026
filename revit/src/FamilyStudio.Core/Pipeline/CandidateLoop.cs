@@ -76,7 +76,7 @@ public static class CandidateLoop
                     throw new InvalidOperationException($"The {request.Name} step still failed validation after {MaxCorrections} corrections: {error.Message}", error);
                 var usePatch = hasRejected && merge is not null && patchSchema is not null;
                 feedback = StudioPrompts.Correction(issues, usePatch ? StudioJson.Hash(rejected) : null,
-                    hasRejected ? StudioJson.Write(rejected) : result.Text);
+                    hasRejected ? StudioJson.WriteCompact(rejected) : result.Text);
             }
         }
     }
