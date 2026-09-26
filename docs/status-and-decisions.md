@@ -28,10 +28,23 @@ Live, with Codex 0.154.0-alpha.6.2 (the build that ships with the ChatGPT app):
   second attempt stays open until cancelled.
 - `codex app-server` exits as soon as its standard input closes.
 
+On Windows 11 Pro ARM64 with Revit 2027.3 (x64 under emulation), .NET SDK 10.0.401 and Codex CLI 0.157.1,
+following [local-install.md](local-install.md):
+
+- `install.ps1 -RevitYear 2027` builds against the local Revit API with 2 MSB3277 warnings
+  (`Microsoft.VisualBasic` and `System.Drawing` version conflicts from Revit's own assemblies) and
+  registers the manifest.
+- After the unsigned add-in prompt, Revit loads the add-in: `Starting External Application: Family Studio`
+  succeeds, the **Family Studio** tab gets its **Design** panel and button, and `ThemeChanged` is
+  registered.
+- The winget Codex CLI (`OpenAI.Codex`) runs (`codex-cli 0.157.1`), but it installs no `codex.exe`, so
+  Family Studio needs `OPENAI_CODEX_PATH`.
+
 ### Not verified yet
 
-- **Anything inside Revit or Rhino.** No Windows machine has run either plug-in. See the checklist at
-  the end of [revit-integration.md](revit-integration.md).
+- **Anything inside Revit beyond loading, and anything in Rhino.** The Revit add-in loads (above), but its
+  window, sign-in and builds have not been run in Revit, and no Windows machine has run the Rhino
+  plug-in. See the checklist at the end of [revit-integration.md](revit-integration.md).
 - A completed in-app ChatGPT sign-in (browser and device code). Starting and cancelling one is
   verified; finishing one needs a person at the browser.
 - A live collection run, and live review and repair (the probe builds without review).
@@ -39,7 +52,13 @@ Live, with Codex 0.154.0-alpha.6.2 (the build that ships with the ChatGPT app):
 
 ### Open items
 
-- The first Windows run of both plug-ins, with the checklist above.
+- The rest of the first Windows run: the Revit checklist above, and the Rhino plug-in.
+- `CodexExecutable` does not find the winget Codex CLI: there is no `codex.exe` on PATH, and its package
+  folder (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\OpenAI.Codex_*`, binary
+  `codex-<arch>-pc-windows-msvc.exe`) is not a search location. Until it is, set `OPENAI_CODEX_PATH`.
+- Template fallback: Revit 2027 keeps its imperial templates in `Family Templates\English-Imperial`, not
+  `English_I`. `Metric Furniture.rft` in `English` is still found, so this only matters where the metric
+  templates are missing.
 
 ### Runtime review (2026-09-26)
 

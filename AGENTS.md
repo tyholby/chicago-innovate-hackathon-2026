@@ -31,6 +31,7 @@ Rhino 8 scaffold that shows a hello-world panel in the same design language.
 | [docs/pipeline.md](docs/pipeline.md) | Prompts, output schemas, geometry rules, tolerances, placement, corrections, review |
 | [docs/codex-integration.md](docs/codex-integration.md) | Anything touching Codex: launch, isolation, sign-in, stages, debugging |
 | [docs/revit-integration.md](docs/revit-integration.md) | The add-in, Revit API work, builds per Revit year, install |
+| [docs/local-install.md](docs/local-install.md) | Installing or reloading the Revit add-in on someone's Windows machine: prerequisites, admin steps, the security prompt |
 | [docs/rhino-integration.md](docs/rhino-integration.md) | The Rhino plug-in: targets, IDs, loading, bringing the pipeline over |
 | [docs/design-system.md](docs/design-system.md) | Any UI work, in Revit or Rhino |
 | [docs/status-and-decisions.md](docs/status-and-decisions.md) | What is verified, what is not, and decisions already made |
@@ -51,7 +52,9 @@ to reference-only Revit API packages when no local Revit is installed, and the R
 Framework reference assemblies for its net48 lane. They only **run** on Windows inside Revit or Rhino.
 
 On Windows, `revit\scripts\install.ps1 -RevitYear 2026 -Launch` builds, registers and starts Revit, and
-`rhino\scripts\run.ps1` builds and starts Rhino 8 with the plug-in loaded from the build folder.
+`rhino\scripts\run.ps1` builds and starts Rhino 8 with the plug-in loaded from the build folder. Setting
+up or reloading the Revit add-in on someone's machine as an agent: follow
+[docs/local-install.md](docs/local-install.md), which starts Revit through Explorer instead of `-Launch`.
 
 ## Before you finish a change
 
