@@ -33,3 +33,7 @@ git and never committed.
   the sign-in refreshed in `%LOCALAPPDATA%\FamilyStudio\codex-home`. Set `OPENAI_CODEX_HOME` to reuse
   another Codex sign-in, such as `%USERPROFILE%\.codex`.
 - **OpenRouter.** `OPENROUTER_API_KEY` is read by both plugins and reserved for upcoming features.
+
+## License
+
+[MIT](LICENSE)

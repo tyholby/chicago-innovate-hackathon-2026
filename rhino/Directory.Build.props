@@ -9,7 +9,7 @@
     <Product>Family Studio</Product>
     <Company>Family Studio</Company>
     <Authors>Chicago Innovate Hackathon 2026 team</Authors>
-    <Copyright>Copyright 2026 the Family Studio authors</Copyright>
+    <Copyright>Copyright (c) 2026 Ty Holbrook</Copyright>
 
     <LangVersion>12</LangVersion>
     <Nullable>enable</Nullable>
