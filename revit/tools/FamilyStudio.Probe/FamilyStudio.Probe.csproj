@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A command-line harness for the Family Studio pipeline that needs no Revit. It signs in with
+    ChatGPT through Codex, runs the real brief, reference and geometry stages, and draws each
+    family as an axonometric SVG. Useful for prompt work on any machine, including a Mac.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>familystudio-probe</AssemblyName>
+    <RootNamespace>FamilyStudio.Probe</RootNamespace>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FamilyStudio.Core\FamilyStudio.Core.csproj" />
+  </ItemGroup>
+
+</Project>

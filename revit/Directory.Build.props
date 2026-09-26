@@ -1,0 +1,34 @@
+<Project>
+  <!--
+    Shared build settings for every project under revit/.
+
+    Build for a specific Revit year with -p:RevitYear=2025, 2026 (default) or 2027.
+    The year only matters to the Revit add-in project; the core library, tests and
+    probe are plain .NET and ignore it.
+  -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <Product>Family Studio</Product>
+    <Company>Family Studio</Company>
+    <Authors>Chicago Innovate Hackathon 2026 team</Authors>
+    <Copyright>Copyright 2026 the Family Studio authors</Copyright>
+
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <RevitYear Condition="'$(RevitYear)' == ''">2026</RevitYear>
+
+    <!-- Keep each Revit year's restore and build output apart, so switching years never mixes them. -->
+    <BaseIntermediateOutputPath Condition="'$(MSBuildProjectName)' == 'FamilyStudio.Revit'">obj/$(RevitYear)/</BaseIntermediateOutputPath>
+    <!-- Other years' generated files live beside this year's; never compile them. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

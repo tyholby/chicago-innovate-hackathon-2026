@@ -1,0 +1,40 @@
+<!--
+  Family Studio design tokens: PAPER (light).
+  Warm drafting paper, near-black ink, one cobalt accent. Night.xaml defines the same keys for
+  Revit's dark theme. Always reference these with DynamicResource so the theme can switch live.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="FS.Bg" Color="#F4F2ED"/>
+    <SolidColorBrush x:Key="FS.Surface" Color="#FAF9F6"/>
+    <SolidColorBrush x:Key="FS.Raised" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="FS.Rule" Color="#DEDAD1"/>
+    <SolidColorBrush x:Key="FS.RuleStrong" Color="#8C877C"/>
+
+    <SolidColorBrush x:Key="FS.Ink" Color="#1B1A17"/>
+    <SolidColorBrush x:Key="FS.Ink2" Color="#4F4B44"/>
+    <SolidColorBrush x:Key="FS.Ink3" Color="#6A655B"/>
+
+    <SolidColorBrush x:Key="FS.Accent" Color="#2B45CF"/>
+    <SolidColorBrush x:Key="FS.AccentHover" Color="#2139B3"/>
+    <SolidColorBrush x:Key="FS.AccentPressed" Color="#1A2E94"/>
+    <SolidColorBrush x:Key="FS.OnAccent" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="FS.AccentWash" Color="#EEF1FC"/>
+
+    <!-- Non-photo blue: construction lines, AI-proposed and not yet checked. -->
+    <SolidColorBrush x:Key="FS.Construction" Color="#3D8FC6"/>
+
+    <SolidColorBrush x:Key="FS.Success" Color="#2E6B3F"/>
+    <SolidColorBrush x:Key="FS.SuccessTint" Color="#E1EDE2"/>
+    <SolidColorBrush x:Key="FS.Warning" Color="#7A4D00"/>
+    <SolidColorBrush x:Key="FS.WarningTint" Color="#F6EACB"/>
+    <!-- Redline: errors only. -->
+    <SolidColorBrush x:Key="FS.Danger" Color="#B8321F"/>
+    <SolidColorBrush x:Key="FS.DangerTint" Color="#F8E1DC"/>
+
+    <SolidColorBrush x:Key="FS.Focus" Color="#2B45CF"/>
+    <SolidColorBrush x:Key="FS.Selection" Color="#DDE3FA"/>
+    <SolidColorBrush x:Key="FS.Poche" Color="#141B1A17"/>
+    <SolidColorBrush x:Key="FS.Scrim" Color="#661B1A17"/>
+    <Color x:Key="FS.ShadowColor">#1B1A17</Color>
+</ResourceDictionary>

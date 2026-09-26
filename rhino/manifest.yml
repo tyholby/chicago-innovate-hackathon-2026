@@ -1,0 +1,15 @@
+---
+# Yak package manifest, used by scripts/install.ps1 to install Family Studio locally.
+# `name` matches the plug-in's assembly name (FamilyStudio.rhp). Keep `version` in step with
+# <Version> in Directory.Build.props.
+name: FamilyStudio
+version: 0.1.0
+authors:
+  - Chicago Innovate Hackathon 2026 team
+description: |
+  Family Studio for Rhino 8. For now it opens a hello-world panel in the Family Studio design language.
+url: https://github.com/tyholby/chicago-innovate-hackathon-2026
+keywords:
+  - furniture
+  - architecture
+  - families

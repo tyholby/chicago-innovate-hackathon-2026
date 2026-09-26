@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Everything that does not need Revit: the design model, geometry validation,
+    placement rules, prompts, the Codex app-server client and the pipeline that
+    ties them together. It targets plain net8.0 so it loads in Revit 2025 and 2026
+    (.NET 8) and in Revit 2027 (.NET 10), and so its tests run on any OS.
+
+    It deliberately has no package references. Revit 2025 and 2026 load add-ins
+    into the host's own context, where a newer System.Text.Json than the one the
+    host already loaded cannot bind, so the core only uses what .NET 8 ships.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>FamilyStudio.Core</RootNamespace>
+    <AssemblyName>FamilyStudio.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FamilyStudio.Core.Tests" />
+  </ItemGroup>
+
+</Project>

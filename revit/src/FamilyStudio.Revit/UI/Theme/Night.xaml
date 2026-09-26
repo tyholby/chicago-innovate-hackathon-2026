@@ -1,0 +1,38 @@
+<!--
+  Family Studio design tokens: NIGHT DRAFTING (dark).
+  Sampled to sit inside Revit's dark UI (#2E343F raised surface), with a lifted cobalt accent.
+  Same keys as Paper.xaml.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="FS.Bg" Color="#1C2027"/>
+    <SolidColorBrush x:Key="FS.Surface" Color="#242932"/>
+    <SolidColorBrush x:Key="FS.Raised" Color="#2E343F"/>
+    <SolidColorBrush x:Key="FS.Rule" Color="#3A414E"/>
+    <SolidColorBrush x:Key="FS.RuleStrong" Color="#808BA0"/>
+
+    <SolidColorBrush x:Key="FS.Ink" Color="#EEF0F3"/>
+    <SolidColorBrush x:Key="FS.Ink2" Color="#B6BDC9"/>
+    <SolidColorBrush x:Key="FS.Ink3" Color="#9CA4B1"/>
+
+    <SolidColorBrush x:Key="FS.Accent" Color="#8FA3FF"/>
+    <SolidColorBrush x:Key="FS.AccentHover" Color="#A5B5FF"/>
+    <SolidColorBrush x:Key="FS.AccentPressed" Color="#7389F2"/>
+    <SolidColorBrush x:Key="FS.OnAccent" Color="#12151B"/>
+    <SolidColorBrush x:Key="FS.AccentWash" Color="#262E4A"/>
+
+    <SolidColorBrush x:Key="FS.Construction" Color="#A4DDED"/>
+
+    <SolidColorBrush x:Key="FS.Success" Color="#74CE90"/>
+    <SolidColorBrush x:Key="FS.SuccessTint" Color="#1E3327"/>
+    <SolidColorBrush x:Key="FS.Warning" Color="#E8B754"/>
+    <SolidColorBrush x:Key="FS.WarningTint" Color="#3A3019"/>
+    <SolidColorBrush x:Key="FS.Danger" Color="#FF8472"/>
+    <SolidColorBrush x:Key="FS.DangerTint" Color="#43231F"/>
+
+    <SolidColorBrush x:Key="FS.Focus" Color="#8FA3FF"/>
+    <SolidColorBrush x:Key="FS.Selection" Color="#2C3866"/>
+    <SolidColorBrush x:Key="FS.Poche" Color="#1FEEF0F3"/>
+    <SolidColorBrush x:Key="FS.Scrim" Color="#99000000"/>
+    <Color x:Key="FS.ShadowColor">#000000</Color>
+</ResourceDictionary>

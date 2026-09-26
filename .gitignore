@@ -1,0 +1,20 @@
+# Secrets: only the .env.example templates are committed.
+.env
+.env.*
+!.env.example
+
+# Build output
+bin/
+obj/
+artifacts/
+*.yak
+TestResults/
+
+# IDEs and OS
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db

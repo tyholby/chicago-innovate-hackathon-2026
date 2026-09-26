@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Revit add-in: ribbon button, native family builder, preview room, and the WPF window.
+
+    Build for one Revit year at a time:
+      dotnet build -c Release -p:RevitYear=2026
+    Revit 2025 and 2026 load net8.0-windows add-ins (their .5 updates run them on .NET 10, which is fine);
+    Revit 2027 requires net10.0-windows.
+
+    Revit API assemblies come from the local Revit install when it exists
+    (C:\Program Files\Autodesk\Revit <year>), and otherwise from reference-only NuGet packages,
+    so the project also builds on a machine without Revit.
+  -->
+  <PropertyGroup>
+    <TargetFramework Condition="'$(RevitYear)' &gt;= '2027'">net10.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(RevitYear)' &lt; '2027'">net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>FamilyStudio.Revit</RootNamespace>
+    <AssemblyName>FamilyStudio.Revit</AssemblyName>
+    <OutputPath>bin/$(Configuration)/$(RevitYear)/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+
+    <RevitInstallDir Condition="'$(RevitInstallDir)' == ''">$(ProgramW6432)\Autodesk\Revit $(RevitYear)</RevitInstallDir>
+    <UseRevitNuget Condition="'$(UseRevitNuget)' == '' and !Exists('$(RevitInstallDir)\RevitAPI.dll')">true</UseRevitNuget>
+    <DefineConstants Condition="'$(RevitYear)' &gt;= '2027'">$(DefineConstants);REVIT2027_OR_GREATER</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(UseRevitNuget)' != 'true'">
+    <Reference Include="RevitAPI">
+      <HintPath>$(RevitInstallDir)\RevitAPI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>$(RevitInstallDir)\RevitAPIUI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseRevitNuget)' == 'true'">
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitYear).*" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitYear).*" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FamilyStudio.Core\FamilyStudio.Core.csproj" />
+  </ItemGroup>
+
+  <!-- revit/.env travels next to the add-in so the plugin can read it at runtime. It is never committed. -->
+  <ItemGroup>
+    <None Include="..\..\.env" Condition="Exists('..\..\.env')" Link=".env" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

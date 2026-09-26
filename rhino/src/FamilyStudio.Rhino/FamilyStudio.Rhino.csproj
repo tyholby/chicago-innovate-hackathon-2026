@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Family Studio for Rhino 8: a RhinoCommon plug-in (.rhp) with a docked Eto panel.
+
+    Two target frameworks, like McNeel's template: net7.0 is what Rhino 8 loads by default
+    (Rhino 8.20 and later run it on .NET 8), and net48 covers Rhino started with /netfx.
+    Build with: dotnet build -c Release
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net7.0;net48</TargetFrameworks>
+    <TargetExt>.rhp</TargetExt>
+    <AssemblyName>FamilyStudio</AssemblyName>
+    <RootNamespace>FamilyStudio.Rhino</RootNamespace>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <NoWarn>$(NoWarn);NU1701;CA1416</NoWarn>
+    <!-- Rhino identifies a plug-in by its assembly GUID. It must never change between releases. -->
+    <PlugInGuid>d668aadc-d98b-4748-b2d4-c0e3664648bf</PlugInGuid>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.GuidAttribute">
+      <_Parameter1>$(PlugInGuid)</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      RhinoCommon carries RhinoCommon.dll, Rhino.UI.dll and Eto.dll as compile references.
+      ExcludeAssets="runtime" keeps them out of the output: Rhino supplies its own at load time,
+      and shipping copies causes assembly identity conflicts inside Rhino.
+    -->
+    <PackageReference Include="RhinoCommon" Version="$(RhinoCommonVersion)" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
+    <!-- Used only to draw the panel icon. Pinned to 7.0.0 so it binds to Rhino's own copy where one exists. -->
+    <PackageReference Include="System.Drawing.Common" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Reference Include="System.Drawing" />
+    <!-- Lets the net48 lane compile on machines without .NET Framework targeting packs (for example a Mac). -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- rhino/.env travels next to the plug-in so it can be read at runtime. It is never committed. -->
+  <ItemGroup>
+    <None Include="..\..\.env" Condition="Exists('..\..\.env')" Link=".env" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

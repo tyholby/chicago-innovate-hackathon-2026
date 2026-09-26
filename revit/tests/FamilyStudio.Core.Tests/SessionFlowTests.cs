@@ -1,0 +1,206 @@
+using FamilyStudio.Core.Json;
+using FamilyStudio.Core.Model;
+using FamilyStudio.Core.Pipeline;
+using FamilyStudio.Core.Prompts;
+using FamilyStudio.Core.Validation;
+
+namespace FamilyStudio.Core.Tests;
+
+public class SessionFlowTests : IDisposable
+{
+    private readonly string _folder = Path.Combine(Path.GetTempPath(), "fs-tests-" + Guid.NewGuid().ToString("N"));
+    private static readonly StageSettings Settings = new(new ModelChoice("test-model", "low"), Fidelity.Concept);
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_folder, recursive: true); } catch (IOException) { }
+    }
+
+    /// <summary>Answers each stage from a script keyed by stage name, recording every request.</summary>
+    private sealed class ScriptedAgent(string folder) : IStudioAgent
+    {
+        public readonly List<StageRequest> Requests = new();
+        public readonly Dictionary<string, Queue<Func<StageRequest, string>>> Script = new();
+        public Func<CancellationToken, Task>? BeforeEachStage;
+        public event Action<string>? Progress { add { } remove { } }
+
+        public async Task<StageResult> RunAsync(StageRequest request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            if (BeforeEachStage is not null) await BeforeEachStage(cancellationToken);
+            if (request.Kind == StageKind.Image)
+            {
+                var path = Path.Combine(folder, $"generated-{Requests.Count}.png");
+                var png = new byte[64];
+                new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, (byte)'I', (byte)'H', (byte)'D', (byte)'R', 0, 0, 0x06, 0, 0, 0, 0x04, 0 }.CopyTo(png, 0);
+                Directory.CreateDirectory(folder);
+                await File.WriteAllBytesAsync(path, png, cancellationToken);
+                return new StageResult("img", "", new GeneratedImage("item-1", path, null), null, "test-model", TimeSpan.Zero);
+            }
+            var answer = Script[request.Name].Dequeue()(request);
+            return new StageResult($"s{Requests.Count}", answer, null, null, "test-model", TimeSpan.Zero);
+        }
+
+        public void Dispose() { }
+    }
+
+    private sealed class FakeHost : IStudioHost
+    {
+        public readonly List<BuildProposal> Applied = new();
+        private StudioBrief? _brief;
+        private readonly Dictionary<string, FamilyReceipt> _families = new();
+        private readonly Dictionary<string, InstanceReceipt> _instances = new();
+        private long _stamp;
+        public event Action? DocumentUnavailable { add { } remove { } }
+        public Task WhenIdle => Task.CompletedTask;
+        public void BindDesign(StudioBrief brief) { _brief = brief; _families.Clear(); _instances.Clear(); }
+        public Task<NativeSnapshot> EnsureRoomAsync(CancellationToken cancellationToken) => Task.FromResult(Snapshot());
+        public Task<NativeSnapshot> ApplyAsync(BuildProposal proposal, NativeExpectation? expected, CancellationToken cancellationToken)
+        {
+            expected?.Verify(Snapshot());
+            Applied.Add(proposal);
+            foreach (var r in proposal.Recipes)
+                _families[r.AssetId] = new FamilyReceipt(r.AssetId, r.AssetId, "t", "x.rfa", r.AssetId, r.AssetId, r.Parts.Length, RecipeRules.Validate(r, _brief!).Size, 1);
+            foreach (var p in proposal.Placements)
+                _instances[p.Key] = new InstanceReceipt(p.Key, p.AssetId, p.Key, p.PositionM, p.RotationDegrees, p.PositionM, p.PositionM);
+            _stamp++;
+            return Task.FromResult(Snapshot());
+        }
+        public Task<NativeSnapshot> CaptureAsync(CancellationToken cancellationToken) => Task.FromResult(Snapshot() with
+        {
+            Captures = NativeSnapshot.CaptureViews.Select(v => new CaptureReceipt(v, v, "x.png", 10, 10, "")).ToArray()
+        });
+        public Task<ProjectChoice[]> ListProjectsAsync(CancellationToken cancellationToken) => Task.FromResult(Array.Empty<ProjectChoice>());
+        public Task LoadFamiliesAsync(string projectKey, IReadOnlyList<string> assetIds, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task ShowRoomAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task CloseAsync() => Task.CompletedTask;
+        public void Dispose() { }
+        private NativeSnapshot Snapshot() => new("room", "Room", _families.Values.ToArray(), _instances.Values.ToArray(), Array.Empty<CaptureReceipt>(), _stamp);
+    }
+
+    private (StudioSession Session, ScriptedAgent Agent, FakeHost Host) Create()
+    {
+        var agent = new ScriptedAgent(_folder);
+        var host = new FakeHost();
+        return (new StudioSession(agent, host, new SessionJournal(Path.Combine(_folder, "session"))), agent, host);
+    }
+
+    private static StudioDraft StoolDraft(Vec3? size = null) =>
+        new("", new[] { "A four-legged timber stool" }, Array.Empty<string>(), new[] { "" }, null, size);
+
+    [Fact]
+    public async Task A_single_item_goes_from_words_to_a_centred_native_family()
+    {
+        var (session, agent, host) = Create();
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(Samples.StoolBrief()) });
+        agent.Script["recipe-a1"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(new RecipeDraft("a1", Samples.StoolParts())) });
+
+        var draft = StoolDraft();
+        await session.GenerateAsync(draft, Settings);
+        Assert.Equal(StudioState.Review, session.State);
+        Assert.Equal(ReferenceImage.Generated, session.Reference!.Source);
+
+        session.Accept(draft);
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+
+        Assert.Equal(StudioState.Built, session.State);
+        var placement = Assert.Single(Assert.Single(host.Applied).Placements);
+        Assert.Equal(Vec3.Zero, placement.PositionM);
+        Assert.Equal(new[] { "brief", "reference", "recipe-a1" }, agent.Requests.Select(r => r.Name));
+        Assert.Contains(agent.Requests, r => r.Name == "reference" && r.Kind == StageKind.Image);
+    }
+
+    [Fact]
+    public async Task Known_dimensions_are_enforced_and_confirmed()
+    {
+        var (session, agent, _) = Create();
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(Samples.StoolBrief()) });
+        var draft = StoolDraft(new Vec3(0.6, 0.5, 0.75));
+        await session.GenerateAsync(draft, Settings);
+        Assert.True(session.Brief!.Assets[0].DimensionsConfirmed);
+        Assert.Equal(new Vec3(0.6, 0.5, 0.75), session.Brief.Assets[0].SizeM);
+    }
+
+    [Fact]
+    public async Task A_rejected_recipe_is_corrected_with_a_patch_pinned_to_its_hash()
+    {
+        var (session, agent, _) = Create();
+        var tooTall = new RecipeDraft("a1", Samples.StoolParts(height: 0.9));
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(Samples.StoolBrief()) });
+        agent.Script["recipe-a1"] = new(new Func<StageRequest, string>[]
+        {
+            _ => StudioJson.Write(tooTall),
+            request =>
+            {
+                Assert.Contains("dimension_mismatch", request.Prompt);
+                var fixedParts = Samples.StoolParts().Where(p => p.Name is "seat" or "leg-fl" or "leg-fr" or "leg-bl" or "leg-br").ToArray();
+                return StudioJson.Write(new CandidatePatch<RecipeDraft>(StudioJson.Hash(tooTall), new RecipeDraft("a1", fixedParts)));
+            }
+        });
+        var draft = StoolDraft();
+        await session.GenerateAsync(draft, Settings);
+        session.Accept(draft);
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+        Assert.Equal(StudioState.Built, session.State);
+        Assert.Equal(2, agent.Requests.Count(r => r.Name == "recipe-a1"));
+    }
+
+    [Fact]
+    public async Task Cancelling_reports_cancelled_and_keeps_the_brief()
+    {
+        var (session, agent, _) = Create();
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(Samples.StoolBrief()) });
+        var draft = StoolDraft();
+        await session.GenerateAsync(draft, Settings);
+        session.Accept(draft);
+        agent.BeforeEachStage = async token => { session.Cancel(); await Task.Delay(Timeout.Infinite, token); };
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+        Assert.Equal(StudioState.Cancelled, session.State);
+        Assert.NotNull(session.Brief);
+        Assert.True(session.IsAccepted);
+    }
+
+    [Fact]
+    public async Task Inputs_that_change_after_preparation_cannot_be_accepted()
+    {
+        var (session, agent, _) = Create();
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(Samples.StoolBrief()) });
+        await session.GenerateAsync(StoolDraft(), Settings);
+        var edited = StoolDraft() with { Assets = new[] { "A three-legged stool" } };
+        Assert.Throws<InvalidOperationException>(() => session.Accept(edited));
+    }
+
+    [Fact]
+    public async Task A_collection_is_planned_arranged_and_built()
+    {
+        var (session, agent, host) = Create();
+        var brief = Samples.CollectionBrief();
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(brief) });
+        agent.Script["recipe-a1"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(new RecipeDraft("a1", Samples.Table(brief).Parts)) });
+        for (var i = 2; i <= 7; i++)
+        {
+            var id = $"a{i}";
+            var floor = i != 2;
+            agent.Script["recipe-" + id] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(new RecipeDraft(id, Samples.Box(id, new Vec3(0.5, 0.5, 0.5), brief, floor).Parts)) });
+        }
+        agent.Script["layout"] = new(new Func<StageRequest, string>[]
+        {
+            _ => StudioJson.Write(new PlacementIntentPlan(new[]
+            {
+                new PlacementIntent("a1-1", "a1", "absolute", Vec3.Zero, 0, null, null, null, null, null, null),
+                new PlacementIntent("a2-1", "a2", "surface", Vec3.Zero, 0, "a1-1", "top", null, null, null, null)
+            }.Concat(Enumerable.Range(3, 5).Select(i => new PlacementIntent($"a{i}-1", $"a{i}", "absolute", new Vec3(-3.2 + (i - 3) * 1.2, -2.2, 0), 0, null, null, null, null, null, null))).ToArray()))
+        });
+
+        var draft = Presets.Create("office");
+        await session.GenerateAsync(draft, Settings);
+        Assert.Equal(StudioState.Review, session.State);
+        session.Accept(draft);
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+
+        Assert.True(session.State == StudioState.Built, $"{session.State}: {session.Status}");
+        var proposal = Assert.Single(host.Applied);
+        Assert.Equal(7, proposal.Recipes.Length);
+        Assert.Equal(0.75, proposal.Placements.Single(p => p.Key == "a2-1").PositionM.Z, 6);
+    }
+}

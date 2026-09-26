@@ -1,0 +1,753 @@
+<Window x:Class="FamilyStudio.Revit.UI.StudioWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:FamilyStudio.Revit.UI"
+        Title="Family Studio" Width="1220" Height="800" MinWidth="1000" MinHeight="660"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="True"
+        Background="{DynamicResource FS.Bg}" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="52" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Index 0 is the theme. ThemeManager swaps it for Night.xaml when Revit is dark. -->
+                <ResourceDictionary Source="/FamilyStudio.Revit;component/UI/Theme/Paper.xaml"/>
+                <ResourceDictionary Source="/FamilyStudio.Revit;component/UI/Theme/Studio.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <ui:VisibleWhen x:Key="Visible"/>
+            <ui:VisibleWhen x:Key="Collapsed" Invert="True"/>
+            <ui:IsValue x:Key="Is"/>
+
+            <!-- A title block cell: tracked label over a value. -->
+            <Style x:Key="Cell" TargetType="Border">
+                <Setter Property="BorderBrush" Value="{DynamicResource FS.Rule}"/>
+                <Setter Property="BorderThickness" Value="1,0,0,0"/>
+                <Setter Property="Padding" Value="14,9,14,8"/>
+            </Style>
+            <Style x:Key="Section" TargetType="ui:Caps">
+                <Setter Property="FontFamily" Value="{StaticResource FS.Font.Label}"/>
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{DynamicResource FS.Ink3}"/>
+                <Setter Property="Margin" Value="0,22,0,6"/>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Window.InputBindings>
+        <KeyBinding Gesture="Ctrl+Enter" Command="{Binding PrimaryCommand}"/>
+        <KeyBinding Key="Escape" Command="{Binding CancelCommand}"/>
+    </Window.InputBindings>
+
+    <Border x:Name="Root" BorderBrush="{DynamicResource FS.RuleStrong}" BorderThickness="1" Background="{DynamicResource FS.Bg}">
+        <Grid TextElement.FontFamily="{StaticResource FS.Font.Sans}" TextElement.Foreground="{DynamicResource FS.Ink}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="52"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- ============================== HEADER: wordmark and sheet index ============================== -->
+            <Grid Background="{DynamicResource FS.Surface}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Rectangle Grid.ColumnSpan="6" Height="1" VerticalAlignment="Bottom" Fill="{DynamicResource FS.Rule}"/>
+
+                <StackPanel Orientation="Horizontal" Margin="20,0,36,0" VerticalAlignment="Center">
+                    <Canvas Width="22" Height="22" Margin="0,0,12,0" VerticalAlignment="Center">
+                        <Path Data="M11,2 L20,6.5 L11,11 L2,6.5 Z" Fill="{DynamicResource FS.Surface}" Stroke="{DynamicResource FS.Ink}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
+                        <Path Data="M2,6.5 L11,11 L11,20.5 L2,16 Z" Fill="{DynamicResource FS.Accent}" Stroke="{DynamicResource FS.Ink}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
+                        <Path Data="M11,11 L20,6.5 L20,16 L11,20.5 Z" Fill="{DynamicResource FS.Rule}" Stroke="{DynamicResource FS.Ink}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
+                    </Canvas>
+                    <StackPanel VerticalAlignment="Center">
+                        <ui:Caps Label="Family Studio" FontSize="13" Foreground="{DynamicResource FS.Ink}"/>
+                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Foreground="{DynamicResource FS.Ink3}">
+                            <Run Text="FOR REVIT"/> <Run Text="{Binding RevitVersion, Mode=OneWay}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="{Binding IsSignedIn, Converter={StaticResource Visible}}">
+                    <RadioButton Style="{StaticResource FS.SheetTab}" Content="Brief" Tag="IF-001" WindowChrome.IsHitTestVisibleInChrome="True"
+                                 IsChecked="{Binding CurrentSheet, Converter={StaticResource Is}, ConverterParameter=Brief}"/>
+                    <RadioButton Style="{StaticResource FS.SheetTab}" Content="Reference" Tag="IF-201" WindowChrome.IsHitTestVisibleInChrome="True"
+                                 IsEnabled="{Binding CanOpenReference}"
+                                 IsChecked="{Binding CurrentSheet, Converter={StaticResource Is}, ConverterParameter=Reference}"/>
+                    <RadioButton Style="{StaticResource FS.SheetTab}" Content="Build" Tag="IF-901" WindowChrome.IsHitTestVisibleInChrome="True"
+                                 IsEnabled="{Binding CanOpenBuild}"
+                                 IsChecked="{Binding CurrentSheet, Converter={StaticResource Is}, ConverterParameter=Build}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0"
+                            Visibility="{Binding IsSignedIn, Converter={StaticResource Visible}}">
+                    <Button Style="{StaticResource FS.Button.Quiet}" Content="New design" Command="{Binding NewDesignCommand}"
+                            WindowChrome.IsHitTestVisibleInChrome="True" Margin="0,0,18,0" VerticalAlignment="Center"/>
+                    <Button x:Name="AccountButton" Command="{Binding ToggleSettingsCommand}" WindowChrome.IsHitTestVisibleInChrome="True"
+                            Cursor="Hand" Background="Transparent" BorderThickness="0" ToolTip="Account and settings">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Frame" Background="Transparent" BorderBrush="{DynamicResource FS.Rule}" BorderThickness="1" CornerRadius="2" Padding="10,5">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="7" Height="7" Fill="{DynamicResource FS.Success}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding AccountLabel}" FontSize="12" Foreground="{DynamicResource FS.Ink2}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding PlanLabel}" FontSize="12" Foreground="{DynamicResource FS.Ink3}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                        <Path Data="M0,0 L4,4 L8,0" Stroke="{DynamicResource FS.Ink3}" StrokeThickness="1.3" Margin="10,1,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource FS.RuleStrong}"/></Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Grid.Column="5" Orientation="Horizontal" Margin="8,0,0,0">
+                    <Button Style="{StaticResource FS.Button.Glyph}" Width="46" Height="48" Click="OnMinimize" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimize">
+                        <Path Data="M0,0.5 L10,0.5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1"/>
+                    </Button>
+                    <Button Style="{StaticResource FS.Button.Glyph}" Width="46" Height="48" Click="OnMaximize" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Maximize">
+                        <Rectangle Width="10" Height="10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1"/>
+                    </Button>
+                    <Button Style="{StaticResource FS.Button.Close}" Click="OnClose" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Close">
+                        <Path Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.1"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- ============================== COVER SHEET: sign in ============================== -->
+            <Grid Grid.Row="1" Visibility="{Binding NeedsSignIn, Converter={StaticResource Visible}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1"/>
+                    <ColumnDefinition Width="380"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Construction linework: an isometric grid fading in from the corner. -->
+                <Canvas ClipToBounds="True" IsHitTestVisible="False" Opacity="0.55">
+                    <Path Canvas.Right="-40" Canvas.Bottom="-60" Stroke="{DynamicResource FS.Construction}" StrokeThickness="0.8"
+                          Data="M0,260 L450,0 M60,295 L510,35 M120,330 L570,70 M180,365 L630,105 M240,400 L690,140
+                                M0,140 L450,400 M60,105 L510,365 M120,70 L570,330 M180,35 L630,295 M240,0 L690,260"/>
+                    <Path Canvas.Right="150" Canvas.Bottom="80" Stroke="{DynamicResource FS.Ink}" StrokeThickness="1.2" StrokeLineJoin="Round"
+                          Data="M60,0 L120,35 L60,70 L0,35 Z M0,35 L0,105 L60,140 L60,70 M60,140 L120,105 L120,35"/>
+                </Canvas>
+
+                <StackPanel VerticalAlignment="Center" Margin="72,0,48,40" MaxWidth="560" HorizontalAlignment="Left">
+                    <ui:Caps Label="IF-000  Cover sheet" FontFamily="{StaticResource FS.Font.Mono}" FontWeight="Normal" FontSize="10"/>
+                    <TextBlock Style="{StaticResource FS.Text.Display}" FontSize="40" LineHeight="46" Margin="0,18,0,0">
+                        Words or a photo in.<LineBreak/>A native Revit family out.
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource FS.Text.Body}" Margin="0,18,0,0" FontSize="14" LineHeight="21" MaxWidth="480">
+                        Describe a piece of furniture, or drop in a product photo. Family Studio drafts a reference, checks the
+                        dimensions with you, and builds a Furniture family with real solids and named materials.
+                    </TextBlock>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,34,0,0" Visibility="{Binding SignInCode, Converter={StaticResource Collapsed}}">
+                        <Button Style="{StaticResource FS.Button.Primary}" Content="Sign in with ChatGPT" Command="{Binding SignInCommand}"/>
+                        <Button Style="{StaticResource FS.Button.Quiet}" Content="Use a code instead" Command="{Binding SignInWithCodeCommand}" Margin="22,0,0,0" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource FS.Button.Quiet}" Content="Cancel" Command="{Binding CancelSignInCommand}" Margin="22,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding Connection, Converter={StaticResource Visible}, ConverterParameter=SigningIn}"/>
+                        <Button Style="{StaticResource FS.Button.Secondary}" Content="Try again" Command="{Binding RetryCommand}" Margin="22,0,0,0"
+                                Visibility="{Binding Connection, Converter={StaticResource Visible}, ConverterParameter=CodexMissing}"/>
+                    </StackPanel>
+
+                    <!-- Device code -->
+                    <Border Margin="0,30,0,0" Padding="0,14,0,0" BorderBrush="{DynamicResource FS.Rule}" BorderThickness="0,1,0,0"
+                            Visibility="{Binding SignInCode, Converter={StaticResource Visible}}">
+                        <StackPanel>
+                            <ui:Caps Label="Sign-in code"/>
+                            <TextBox Text="{Binding SignInCode, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                     FontFamily="{StaticResource FS.Font.Mono}" FontSize="30" Foreground="{DynamicResource FS.Ink}" Margin="0,6,0,0"/>
+                            <TextBox Text="{Binding SignInUrl, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                     FontFamily="{StaticResource FS.Font.Mono}" FontSize="12" Foreground="{DynamicResource FS.Accent}" Margin="0,4,0,0"/>
+                            <Button Style="{StaticResource FS.Button.Quiet}" Content="Cancel" Command="{Binding CancelSignInCommand}" HorizontalAlignment="Left" Margin="0,14,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding ConnectionMessage}" Margin="0,22,0,0" MaxWidth="500"/>
+                </StackPanel>
+
+                <Rectangle Grid.Column="1" Fill="{DynamicResource FS.Rule}"/>
+                <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Background="{DynamicResource FS.Surface}">
+                    <StackPanel Margin="28,8,28,28">
+                        <ui:Caps Style="{StaticResource Section}" Label="General notes"/>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource FS.Text.Mono}" Text="1." Foreground="{DynamicResource FS.Ink3}"/>
+                            <TextBlock Grid.Column="1" Style="{StaticResource FS.Text.Body}">Family Studio uses your ChatGPT plan through OpenAI's Codex app. You sign in with OpenAI in your browser; Family Studio never sees your password.</TextBlock>
+                        </Grid>
+                        <Grid Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource FS.Text.Mono}" Text="2." Foreground="{DynamicResource FS.Ink3}"/>
+                            <TextBlock Grid.Column="1" Style="{StaticResource FS.Text.Body}">Your descriptions, photos and Revit previews are sent to OpenAI to design each family. Families, images and logs stay in a session folder on this computer.</TextBlock>
+                        </Grid>
+                        <Grid Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource FS.Text.Mono}" Text="3." Foreground="{DynamicResource FS.Ink3}"/>
+                            <TextBlock Grid.Column="1" Style="{StaticResource FS.Text.Body}">Families are concept geometry: native solids with named materials and one type. They are not certified manufacturer BIM.</TextBlock>
+                        </Grid>
+                        <Grid Margin="0,14,0,0" Visibility="{Binding Connection, Converter={StaticResource Visible}, ConverterParameter=CodexMissing}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource FS.Text.Mono}" Text="4." Foreground="{DynamicResource FS.Danger}"/>
+                            <TextBlock Grid.Column="1" Style="{StaticResource FS.Text.Body}" Foreground="{DynamicResource FS.Danger}">Codex is needed on this computer. Install the Codex app, or run npm install -g @openai/codex, then choose Try again.</TextBlock>
+                        </Grid>
+                        <ui:Caps Style="{StaticResource Section}" Label="Connection"/>
+                        <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding CodexLabel}"/>
+                        <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding CodexHomeLabel}" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- ============================== WORK: drawing area and schedule ============================== -->
+            <Grid Grid.Row="1" Visibility="{Binding IsSignedIn, Converter={StaticResource Visible}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1"/>
+                    <ColumnDefinition Width="372"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ~~~~~ Drawing area ~~~~~ -->
+                <Grid Margin="28,24,28,20">
+
+                    <!-- IF-001 BRIEF, single item: the photo plate -->
+                    <Grid Visibility="{Binding IsBriefSheet, Converter={StaticResource Visible}}">
+                        <ContentControl Style="{StaticResource FS.Plate}" AllowDrop="True" Drop="OnPhotoDrop" DragOver="OnPhotoDragOver"
+                                        ui:Studio.Checked="{Binding HasPhoto}" Visibility="{Binding IsSingle, Converter={StaticResource Visible}}">
+                            <Grid Background="Transparent">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="380"
+                                            Visibility="{Binding HasPhoto, Converter={StaticResource Collapsed}}">
+                                    <Canvas Width="56" Height="44" HorizontalAlignment="Center">
+                                        <Path Data="M1,6 L55,6 L55,43 L1,43 Z M1,34 L18,20 L30,31 L38,24 L55,38" Stroke="{DynamicResource FS.Construction}" StrokeThickness="1.3" StrokeLineJoin="Round"/>
+                                        <Ellipse Canvas.Left="40" Canvas.Top="12" Width="7" Height="7" Stroke="{DynamicResource FS.Construction}" StrokeThickness="1.3"/>
+                                    </Canvas>
+                                    <TextBlock Style="{StaticResource FS.Text.Heading}" Text="Drop a product photo" HorizontalAlignment="Center" Margin="0,18,0,0"/>
+                                    <Button Style="{StaticResource FS.Button.Quiet}" Content="or choose a file" Command="{Binding ChoosePhotoCommand}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                    <TextBlock Style="{StaticResource FS.Text.Small}" TextAlignment="Center" Margin="0,18,0,0">
+                                        Optional. One clear photo of a single freestanding item works best. Without a photo,
+                                        Family Studio draws a reference from your notes.
+                                    </TextBlock>
+                                </StackPanel>
+                                <Grid Visibility="{Binding HasPhoto, Converter={StaticResource Visible}}">
+                                    <Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <Image Source="{Binding PhotoImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <DockPanel Grid.Row="1" Margin="0,12,0,0">
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Quiet}" Content="Remove" Command="{Binding RemovePhotoCommand}"/>
+                                        <ui:Caps FontFamily="{StaticResource FS.Font.Mono}" FontWeight="Normal" FontSize="10" VerticalAlignment="Center"
+                                                 Label="{Binding PhotoCaption, StringFormat='FIG. 1  ·  {0}'}"/>
+                                    </DockPanel>
+                                </Grid>
+                            </Grid>
+                        </ContentControl>
+
+                        <!-- IF-001 BRIEF, collection: seven item cards and a finishes card -->
+                        <Grid Visibility="{Binding IsCollection, Converter={StaticResource Visible}}">
+                            <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <ItemsControl Grid.RowSpan="2" Grid.ColumnSpan="4" ItemsSource="{Binding Items}" IsEnabled="{Binding CanEditBrief}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4" Rows="2"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,12,12" Padding="14,12" Background="{DynamicResource FS.Surface}" BorderBrush="{DynamicResource FS.Rule}" BorderThickness="1">
+                                            <DockPanel>
+                                                <DockPanel DockPanel.Dock="Top">
+                                                    <ContentControl Style="{StaticResource FS.Bubble}" Content="{Binding Number}" Margin="0,0,10,0"/>
+                                                    <TextBox Style="{StaticResource FS.Field}" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Tag="Name" FontWeight="SemiBold"/>
+                                                </DockPanel>
+                                                <TextBox Style="{StaticResource FS.Notes}" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" MinHeight="60" Margin="0,10,0,0"
+                                                         FontSize="12" Tag="Describe it: size, quantity, features, support."/>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Grid.Row="1" Grid.Column="3" Margin="0,0,12,12" Padding="14,12" Background="{DynamicResource FS.Raised}"
+                                    BorderBrush="{DynamicResource FS.RuleStrong}" BorderThickness="1" IsEnabled="{Binding CanEditBrief}">
+                                <DockPanel>
+                                    <ui:Caps DockPanel.Dock="Top" Label="Finishes" Margin="0,4,0,6"/>
+                                    <ItemsControl ItemsSource="{Binding CollectionMaterials}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <DockPanel Margin="0,0,0,4">
+                                                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource FS.Text.Mono}" FontSize="10" Text="{Binding Code}" Foreground="{DynamicResource FS.Ink3}" Width="44" Margin="0,8,0,0"/>
+                                                    <TextBox Style="{StaticResource FS.Field}" FontSize="12" Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" Tag="Finish and where it is used" TextWrapping="Wrap"/>
+                                                </DockPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
+                    </Grid>
+
+                    <!-- IF-201 REFERENCE -->
+                    <Grid Visibility="{Binding IsReferenceSheet, Converter={StaticResource Visible}}">
+                        <Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <ContentControl Style="{StaticResource FS.Plate}" ui:Studio.Checked="True">
+                            <Grid>
+                                <Image Source="{Binding ReferenceImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding ShowGenerating, Converter={StaticResource Visible}}">
+                                    <TextBlock Style="{StaticResource FS.Text.Heading}" Text="{Binding Status}" HorizontalAlignment="Center"/>
+                                    <ui:DraftingLine Width="240" Margin="0,16,0,0" IsActive="{Binding IsBusy}" LineBrush="{DynamicResource FS.Rule}" StrokeBrush="{DynamicResource FS.Construction}"/>
+                                </StackPanel>
+                            </Grid>
+                        </ContentControl>
+                        <ui:Caps Grid.Row="1" Label="{Binding ReferenceCaption}" FontFamily="{StaticResource FS.Font.Mono}" FontWeight="Normal" FontSize="10" Margin="10,8,0,0"/>
+                    </Grid>
+
+                    <!-- IF-901 BUILD -->
+                    <Grid Visibility="{Binding IsBuildSheet, Converter={StaticResource Visible}}">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <DockPanel Margin="10,0,10,10">
+                            <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Quiet}" Content="Show in Revit" Command="{Binding ShowRoomCommand}" VerticalAlignment="Center"/>
+                            <Border Style="{StaticResource FS.Segments}">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource FS.Segment}" Content="Plan" Command="{Binding SelectViewCommand}" CommandParameter="plan"
+                                                 IsChecked="{Binding PreviewView, Mode=OneWay, Converter={StaticResource Is}, ConverterParameter=plan}"/>
+                                    <RadioButton Style="{StaticResource FS.Segment}" Content="Front left" Command="{Binding SelectViewCommand}" CommandParameter="front-left"
+                                                 IsChecked="{Binding PreviewView, Mode=OneWay, Converter={StaticResource Is}, ConverterParameter=front-left}"/>
+                                    <RadioButton Style="{StaticResource FS.Segment}" Content="Front right" Command="{Binding SelectViewCommand}" CommandParameter="front-right"
+                                                 IsChecked="{Binding PreviewView, Mode=OneWay, Converter={StaticResource Is}, ConverterParameter=front-right}"/>
+                                </StackPanel>
+                            </Border>
+                        </DockPanel>
+                        <ContentControl Grid.Row="1" Style="{StaticResource FS.Plate}" ui:Studio.Checked="{Binding HasPreview}">
+                            <Grid>
+                                <Border Background="{DynamicResource FS.Raised}" Visibility="{Binding PreviewImage, Converter={StaticResource Visible}}">
+                                    <Image Source="{Binding PreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                </Border>
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="380" Visibility="{Binding PreviewImage, Converter={StaticResource Collapsed}}">
+                                    <TextBlock Style="{StaticResource FS.Text.Heading}" TextAlignment="Center"
+                                               Text="{Binding Status}" Visibility="{Binding IsBusy, Converter={StaticResource Visible}}"/>
+                                    <ui:DraftingLine Width="240" Margin="0,16,0,0" IsActive="{Binding IsBusy}" LineBrush="{DynamicResource FS.Rule}" StrokeBrush="{DynamicResource FS.Construction}"
+                                                     Visibility="{Binding IsBusy, Converter={StaticResource Visible}}"/>
+                                    <TextBlock Style="{StaticResource FS.Text.Small}" TextAlignment="Center" Visibility="{Binding IsBusy, Converter={StaticResource Collapsed}}">
+                                        Native Revit views of the family appear here once it is built.
+                                    </TextBlock>
+                                </StackPanel>
+                            </Grid>
+                        </ContentControl>
+                        <ui:Caps Grid.Row="2" Label="{Binding PreviewCaption}" FontFamily="{StaticResource FS.Font.Mono}" FontWeight="Normal" FontSize="10" Margin="10,8,0,0"/>
+                    </Grid>
+                </Grid>
+
+                <Rectangle Grid.Column="1" Fill="{DynamicResource FS.Rule}"/>
+
+                <!-- ~~~~~ Schedule column ~~~~~ -->
+                <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Background="{DynamicResource FS.Surface}">
+                    <Grid Margin="28,6,28,28">
+
+                        <!-- IF-001 BRIEF -->
+                        <StackPanel Visibility="{Binding IsBriefSheet, Converter={StaticResource Visible}}" IsEnabled="{Binding CanEditBrief}">
+                            <ui:Caps Style="{StaticResource Section}" Label="Brief"/>
+                            <Border Style="{StaticResource FS.Segments}">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource FS.Segment}" Content="Single item" Command="{Binding SingleModeCommand}" IsChecked="{Binding IsSingle, Mode=OneWay}"/>
+                                    <RadioButton Style="{StaticResource FS.Segment}" Content="Collection of seven" Command="{Binding CollectionModeCommand}" IsChecked="{Binding IsCollection, Mode=OneWay}"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- single item -->
+                            <StackPanel Visibility="{Binding IsSingle, Converter={StaticResource Visible}}">
+                                <ui:Caps Style="{StaticResource Section}" Label="Item"/>
+                                <TextBox Style="{StaticResource FS.Field}" Text="{Binding ItemName, UpdateSourceTrigger=PropertyChanged}" Tag="Name (optional), for example Lounge chair" FontSize="14"/>
+                                <ui:Caps Style="{StaticResource Section}" Label="General notes"/>
+                                <TextBox Style="{StaticResource FS.Notes}" Text="{Binding ItemDescription, UpdateSourceTrigger=PropertyChanged}" MinHeight="112"
+                                         Tag="Describe the piece: its parts, proportions, materials and anything the photo does not show."/>
+
+                                <DockPanel Margin="0,22,0,10">
+                                    <Border DockPanel.Dock="Right" Style="{StaticResource FS.Segments}" Padding="1">
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton Style="{StaticResource FS.Segment}" Content="mm" Padding="9,3" IsChecked="{Binding Unit, Converter={StaticResource Is}, ConverterParameter=mm}"/>
+                                            <RadioButton Style="{StaticResource FS.Segment}" Content="in" Padding="9,3" IsChecked="{Binding Unit, Converter={StaticResource Is}, ConverterParameter=in}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <ui:Caps Label="Overall dimensions" VerticalAlignment="Center"/>
+                                </DockPanel>
+                                <UniformGrid Columns="3" ui:Studio.Checked="{Binding KnownSizeEntered}">
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Text="W  WIDTH" Foreground="{DynamicResource FS.Ink3}" HorizontalAlignment="Center"/>
+                                        <TextBox Style="{StaticResource FS.Dimension}" Text="{Binding WidthText, UpdateSourceTrigger=PropertyChanged}" Tag="auto" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="5,0">
+                                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Text="D  DEPTH" Foreground="{DynamicResource FS.Ink3}" HorizontalAlignment="Center"/>
+                                        <TextBox Style="{StaticResource FS.Dimension}" Text="{Binding DepthText, UpdateSourceTrigger=PropertyChanged}" Tag="auto" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="10,0,0,0">
+                                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Text="H  HEIGHT" Foreground="{DynamicResource FS.Ink3}" HorizontalAlignment="Center"/>
+                                        <TextBox Style="{StaticResource FS.Dimension}" Text="{Binding HeightText, UpdateSourceTrigger=PropertyChanged}" Tag="auto" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <TextBlock Style="{StaticResource FS.Text.Small}" Margin="0,10,0,0">
+                                    Leave blank and Family Studio proposes a size. Known sizes are held within 2 mm. Accepts 650, 25.5 or 2'-6".
+                                </TextBlock>
+
+                                <ui:Caps Style="{StaticResource Section}" Label="Finishes"/>
+                                <TextBox Style="{StaticResource FS.Notes}" Text="{Binding MaterialNotes, UpdateSourceTrigger=PropertyChanged}" MinHeight="70"
+                                         Tag="Optional. One finish per line, up to four: walnut frame, charcoal wool cushions."/>
+                            </StackPanel>
+
+                            <!-- collection -->
+                            <StackPanel Visibility="{Binding IsCollection, Converter={StaticResource Visible}}">
+                                <ui:Caps Style="{StaticResource Section}" Label="Starting point"/>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Secondary}" Content="Use" Command="{Binding UsePresetCommand}" Margin="12,0,0,0"/>
+                                    <ComboBox Style="{StaticResource FS.Combo}" ItemsSource="{Binding CollectionPresets}" SelectedItem="{Binding SelectedPreset}"/>
+                                </DockPanel>
+                                <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding SelectedPreset.Caption}" Margin="0,6,0,0"/>
+                                <ui:Caps Style="{StaticResource Section}" Label="Room and style"/>
+                                <TextBox Style="{StaticResource FS.Notes}" Text="{Binding RoomStyle, UpdateSourceTrigger=PropertyChanged}" MinHeight="176"
+                                         Tag="Describe the room, its style and palette, and how the pieces relate to each other."/>
+                                <TextBlock Style="{StaticResource FS.Text.Small}" Margin="0,12,0,0">
+                                    Seven items and four finishes, drawn on one coordinated reference sheet and arranged in an 8 x 6 m preview room.
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- IF-201 REFERENCE -->
+                        <StackPanel Visibility="{Binding IsReferenceSheet, Converter={StaticResource Visible}}">
+                            <StackPanel Visibility="{Binding IsSingle, Converter={StaticResource Visible}}" IsEnabled="{Binding CanEditReview}">
+                                <ui:Caps Style="{StaticResource Section}" Label="Family"/>
+                                <TextBox Style="{StaticResource FS.Field}" Text="{Binding ReviewName, UpdateSourceTrigger=PropertyChanged}" FontSize="15" FontWeight="SemiBold" Tag="Family name"/>
+                                <ui:Caps Style="{StaticResource Section}" Label="Description"/>
+                                <TextBox Style="{StaticResource FS.Notes}" Text="{Binding ReviewDescription, UpdateSourceTrigger=PropertyChanged}" MinHeight="92"/>
+                                <ui:Caps Style="{StaticResource Section}" Label="Overall dimensions  ·  mm"/>
+                                <UniformGrid Columns="3" ui:Studio.Checked="{Binding Verified}">
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Text="W" Foreground="{DynamicResource FS.Ink3}" HorizontalAlignment="Center"/>
+                                        <TextBox Style="{StaticResource FS.Dimension}" Text="{Binding ReviewWidth, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="5,0">
+                                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Text="D" Foreground="{DynamicResource FS.Ink3}" HorizontalAlignment="Center"/>
+                                        <TextBox Style="{StaticResource FS.Dimension}" Text="{Binding ReviewDepth, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="10,0,0,0">
+                                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Text="H" Foreground="{DynamicResource FS.Ink3}" HorizontalAlignment="Center"/>
+                                        <TextBox Style="{StaticResource FS.Dimension}" Text="{Binding ReviewHeight, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <ToggleButton Style="{StaticResource FS.Stamp}" IsChecked="{Binding Verified}" HorizontalAlignment="Left" Margin="0,14,0,0"
+                                              ToolTip="Verified dimensions come from a spec sheet or a tape measure. The family must match them within 2 mm on every axis."/>
+                                <TextBlock Style="{StaticResource FS.Text.Small}" Margin="0,8,0,0">
+                                    A photo shows appearance, not measurements. Verify only sizes you know.
+                                </TextBlock>
+
+                                <ui:Caps Style="{StaticResource Section}" Label="Finishes"/>
+                                <ItemsControl ItemsSource="{Binding Finishes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="30"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="84"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="20" Height="20" Background="{Binding Swatch}" BorderBrush="{DynamicResource FS.RuleStrong}" BorderThickness="1" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Text="{Binding Code}" Foreground="{DynamicResource FS.Ink3}"/>
+                                                    <TextBox Style="{StaticResource FS.Field}" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="0,2,0,4"/>
+                                                </StackPanel>
+                                                <TextBox Grid.Column="2" Style="{StaticResource FS.Field}" Text="{Binding Hex, UpdateSourceTrigger=PropertyChanged}"
+                                                         FontFamily="{StaticResource FS.Font.Mono}" FontSize="12" Margin="10,12,0,0" Padding="0,2,0,4"/>
+                                                <Button Grid.Column="3" Style="{StaticResource FS.Button.Glyph}" Width="28" Height="28" Margin="4,10,0,0" ToolTip="Remove this finish"
+                                                        Command="{Binding DataContext.RemoveFinishCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+                                                    <Path Data="M0,0 L8,8 M8,0 L0,8" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.2"/>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button Style="{StaticResource FS.Button.Quiet}" Content="Add a finish" Command="{Binding AddFinishCommand}" HorizontalAlignment="Left"/>
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding IsCollection, Converter={StaticResource Visible}}">
+                                <ui:Caps Style="{StaticResource Section}" Label="Furniture schedule"/>
+                                <ItemsControl ItemsSource="{Binding Schedule}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource FS.Rule}" BorderThickness="0,0,0,1" Padding="0,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                    <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="11" Text="{Binding Code}" Foreground="{DynamicResource FS.Ink3}" Margin="0,2,0,0"/>
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Style="{StaticResource FS.Text}" Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="11" Text="{Binding Size}" Foreground="{DynamicResource FS.Ink2}" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Style="{StaticResource FS.Text.Mono}" FontSize="11" Text="{Binding Quantity}" Foreground="{DynamicResource FS.Ink2}"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <ui:Caps Style="{StaticResource Section}" Label="Finishes"/>
+                                <ItemsControl ItemsSource="{Binding Finishes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,0,0,8">
+                                                <Border Width="16" Height="16" Background="{Binding Swatch}" BorderBrush="{DynamicResource FS.RuleStrong}" BorderThickness="1" Margin="0,0,12,0"/>
+                                                <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="11" Text="{Binding Code}" Foreground="{DynamicResource FS.Ink3}" Width="44" VerticalAlignment="Center"/>
+                                                <TextBlock Style="{StaticResource FS.Text}" Text="{Binding Name}" VerticalAlignment="Center"/>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <Button Style="{StaticResource FS.Button.Secondary}" Content="Edit dimensions and finishes" Command="{Binding EditDesignCommand}"
+                                    HorizontalAlignment="Left" Margin="0,26,0,0" Visibility="{Binding IsSingle, Converter={StaticResource Visible}}"/>
+                        </StackPanel>
+
+                        <!-- IF-901 BUILD -->
+                        <StackPanel Visibility="{Binding IsBuildSheet, Converter={StaticResource Visible}}">
+                            <ui:Caps Style="{StaticResource Section}" Label="Detail"/>
+                            <Border Style="{StaticResource FS.Segments}" IsEnabled="{Binding IsBusy, Converter={StaticResource Is}, ConverterParameter=False}">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource FS.Segment}" Content="Concept" IsChecked="{Binding DetailCode, Converter={StaticResource Is}, ConverterParameter=Concept}"/>
+                                    <RadioButton Style="{StaticResource FS.Segment}" Content="Refined" IsChecked="{Binding DetailCode, Converter={StaticResource Is}, ConverterParameter=Refined}"/>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding SelectedFidelity.Summary}" Margin="0,8,0,0"/>
+                            <CheckBox Style="{StaticResource FS.Check}" Content="Review against the reference after building" IsChecked="{Binding ReviewAfterBuild}" Margin="0,14,0,0"/>
+
+                            <ui:Caps Style="{StaticResource Section}" Label="Families"/>
+                            <ItemsControl ItemsSource="{Binding Families}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{DynamicResource FS.Rule}" BorderThickness="0,0,0,1" Padding="0,8">
+                                            <DockPanel>
+                                                <CheckBox DockPanel.Dock="Left" Style="{StaticResource FS.Check}" IsChecked="{Binding Selected}" VerticalAlignment="Top" Margin="0,2,10,0" ToolTip="Include when loading into a project"/>
+                                                <StackPanel>
+                                                    <TextBlock Style="{StaticResource FS.Text}" Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                    <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="11" Text="{Binding Size}" Foreground="{DynamicResource FS.Ink2}" Margin="0,2,0,0"/>
+                                                    <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding Detail}"/>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Style="{StaticResource FS.Text.Small}" Text="Not built yet." Visibility="{Binding Families.Count, Converter={StaticResource Collapsed}}"/>
+
+                            <StackPanel Visibility="{Binding IsSingle, Converter={StaticResource Visible}}">
+                                <ui:Caps Style="{StaticResource Section}" Label="Revise"/>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Secondary}" Content="Revise" Command="{Binding RefineCommand}" Margin="12,0,0,0"/>
+                                    <TextBox Style="{StaticResource FS.Field}" Text="{Binding RevisionText, UpdateSourceTrigger=PropertyChanged}" Tag="Lower the back by 50 mm, thinner arms"/>
+                                </DockPanel>
+                            </StackPanel>
+
+                            <WrapPanel Margin="0,20,0,0">
+                                <Button Style="{StaticResource FS.Button.Secondary}" Content="Review" Command="{Binding ReviewCommand}" Margin="0,0,10,10"
+                                        ToolTip="Compare the native views with the reference and repair what does not match, up to two passes."/>
+                                <Button Style="{StaticResource FS.Button.Secondary}" Content="Save .rfa" Command="{Binding SaveFamilyCommand}" Margin="0,0,10,10"
+                                        Visibility="{Binding IsSingle, Converter={StaticResource Visible}}"/>
+                            </WrapPanel>
+
+                            <ui:Caps Style="{StaticResource Section}" Label="Load into project"/>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Glyph}" Width="32" Height="32" Command="{Binding RefreshProjectsCommand}" ToolTip="Refresh open projects">
+                                    <Path Data="M11,4 A5,5 0 1 0 12,8 M11,0.5 L11,4 L7.5,4" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.3"/>
+                                </Button>
+                                <ComboBox Style="{StaticResource FS.Combo}" ItemsSource="{Binding Projects}" SelectedItem="{Binding SelectedProject}"/>
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource FS.Text.Small}" Margin="0,6,0,0">Open the project in Revit first. Place the family with Revit's Component tool.</TextBlock>
+
+                            <StackPanel Visibility="{Binding HasReview, Converter={StaticResource Visible}}">
+                                <ui:Caps Style="{StaticResource Section}" Label="Review"/>
+                                <TextBlock Style="{StaticResource FS.Text.Body}" Text="{Binding ReviewSummary}"/>
+                                <ItemsControl ItemsSource="{Binding Findings}" Margin="0,8,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource FS.Rule}" BorderThickness="2,0,0,0" Padding="10,2,0,2" Margin="0,6,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Text="{Binding Tag}" Foreground="{DynamicResource FS.Warning}"/>
+                                                    <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding Evidence}" Foreground="{DynamicResource FS.Ink2}"/>
+                                                    <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding Correction}"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- ============================== TITLE BLOCK ============================== -->
+            <Grid Grid.Row="2" Background="{DynamicResource FS.Surface}">
+                <Grid.RowDefinitions><RowDefinition Height="2"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <ui:DraftingLine IsActive="{Binding IsBusy}" LineBrush="{DynamicResource FS.RuleStrong}" StrokeBrush="{DynamicResource FS.Accent}"/>
+                <Grid Grid.Row="1" MinHeight="64">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto" MinWidth="170"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- NOTE: the status line, and a redline note for input problems -->
+                    <Border Padding="20,9,16,8">
+                        <StackPanel VerticalAlignment="Center">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Quiet}" Content="Issue register" Click="OnShowRegister" FontSize="12" Margin="12,0,0,0"
+                                        Visibility="{Binding Activity.Count, Converter={StaticResource Visible}}"/>
+                                <TextBlock Style="{StaticResource FS.Text}" Text="{Binding Status}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Margin="0,2,0,0"
+                                       Visibility="{Binding Detail, Converter={StaticResource Visible}}"/>
+                            <DockPanel Margin="0,4,0,0" Visibility="{Binding Alert, Converter={StaticResource Visible}}">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Glyph}" Width="22" Height="22" Command="{Binding DismissAlertCommand}" ToolTip="Dismiss">
+                                    <Path Data="M0,0 L7,7 M7,0 L0,7" Stroke="{DynamicResource FS.Danger}" StrokeThickness="1.2"/>
+                                </Button>
+                                <Rectangle Width="2" Fill="{DynamicResource FS.Danger}" Margin="0,0,8,0"/>
+                                <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding Alert}" Foreground="{DynamicResource FS.Danger}" TextWrapping="Wrap"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Style="{StaticResource Cell}">
+                        <StackPanel VerticalAlignment="Center">
+                            <ui:Caps Label="Family" FontSize="9"/>
+                            <TextBlock Style="{StaticResource FS.Text}" Text="{Binding TitleName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxWidth="220" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource Cell}">
+                        <StackPanel VerticalAlignment="Center">
+                            <ui:Caps Label="Sheet" FontSize="9"/>
+                            <TextBlock Style="{StaticResource FS.Text.Mono}" Text="{Binding SheetNumber}" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="3" Style="{StaticResource Cell}">
+                        <StackPanel VerticalAlignment="Center">
+                            <ui:Caps Label="Scale" FontSize="9"/>
+                            <TextBlock Style="{StaticResource FS.Text.Mono}" Text="{Binding ScaleLabel}" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="4" Style="{StaticResource Cell}">
+                        <StackPanel VerticalAlignment="Center">
+                            <ui:Caps Label="Status" FontSize="9"/>
+                            <Border x:Name="Stamp" Margin="0,3,0,0" BorderThickness="1" CornerRadius="1" Padding="6,1" HorizontalAlignment="Left">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource FS.RuleStrong}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding StampTone}" Value="Review"><Setter Property="BorderBrush" Value="{DynamicResource FS.Warning}"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding StampTone}" Value="Success"><Setter Property="BorderBrush" Value="{DynamicResource FS.Success}"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding StampTone}" Value="Danger"><Setter Property="BorderBrush" Value="{DynamicResource FS.Danger}"/></DataTrigger>
+                                            <DataTrigger Binding="{Binding StampTone}" Value="Accent"><Setter Property="BorderBrush" Value="{DynamicResource FS.Accent}"/></DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <ui:Caps Label="{Binding StampLabel}" FontSize="10" Foreground="{Binding BorderBrush, ElementName=Stamp}"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="5" Style="{StaticResource Cell}" Padding="16,0,20,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource FS.Button.Quiet}" Content="Cancel" Command="{Binding CancelCommand}" Margin="0,0,18,0" VerticalAlignment="Center"
+                                    Visibility="{Binding IsBusy, Converter={StaticResource Visible}}"/>
+                            <Button Style="{StaticResource FS.Button.Primary}" Command="{Binding PrimaryCommand}" IsEnabled="{Binding CanPrimary}" MinWidth="176"
+                                    ToolTip="Ctrl+Enter">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding PrimaryLabel}"/>
+                                    <Path Data="M0,4 L11,4 M7.5,0.5 L11,4 L7.5,7.5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"
+                                          Margin="12,1,0,0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+                <Rectangle Grid.Row="1" Height="1" VerticalAlignment="Top" Fill="{DynamicResource FS.Rule}"/>
+            </Grid>
+
+            <!-- ============================== SETTINGS ============================== -->
+            <Popup Grid.Row="0" IsOpen="{Binding IsSettingsOpen, Mode=TwoWay}" StaysOpen="False" PlacementTarget="{Binding ElementName=AccountButton}" Placement="Bottom"
+                   HorizontalOffset="-240" VerticalOffset="6" AllowsTransparency="True" PopupAnimation="Fade">
+                <Border Style="{StaticResource FS.Card}" Width="360" Margin="16,4,16,24" TextElement.FontFamily="{StaticResource FS.Font.Sans}">
+                    <StackPanel Margin="22,8,22,20">
+                        <ui:Caps Style="{StaticResource Section}" Label="Signed in with ChatGPT"/>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Quiet}" Content="Sign out" Command="{Binding SignOutCommand}" VerticalAlignment="Center"/>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FS.Text}" Text="{Binding AccountLabel}" FontWeight="SemiBold"/>
+                                <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding PlanLabel}"/>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <ui:Caps Style="{StaticResource Section}" Label="Model"/>
+                        <ComboBox Style="{StaticResource FS.Combo}" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}" IsEnabled="{Binding IsBusy, Converter={StaticResource Is}, ConverterParameter=False}"/>
+                        <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding SelectedModel.Description}" Margin="0,6,0,0"/>
+                        <ui:Caps Style="{StaticResource Section}" Label="Reasoning"/>
+                        <ComboBox Style="{StaticResource FS.Combo}" ItemsSource="{Binding Efforts}" SelectedItem="{Binding SelectedEffort}" IsEnabled="{Binding IsBusy, Converter={StaticResource Is}, ConverterParameter=False}"/>
+                        <TextBlock Style="{StaticResource FS.Text.Small}" Margin="0,6,0,0">Higher reasoning is slower and uses more of your ChatGPT plan, and usually gives better geometry.</TextBlock>
+
+                        <ui:Caps Style="{StaticResource Section}" Label="Codex"/>
+                        <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding CodexLabel}"/>
+                        <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding CodexHomeLabel}" Margin="0,4,0,0"/>
+
+                        <ui:Caps Style="{StaticResource Section}" Label="OpenRouter"/>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Style="{StaticResource FS.Button.Quiet}" Content="Check key" Command="{Binding CheckOpenRouterCommand}" Margin="12,0,0,0"/>
+                            <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding OpenRouterLabel}"/>
+                        </DockPanel>
+
+                        <ui:Caps Style="{StaticResource Section}" Label="Environment file"/>
+                        <TextBlock Style="{StaticResource FS.Text.Small}" Text="{Binding EnvLabel}"/>
+
+                        <Rectangle Height="1" Fill="{DynamicResource FS.Rule}" Margin="0,20,0,14"/>
+                        <WrapPanel>
+                            <Button Style="{StaticResource FS.Button.Quiet}" Content="Open session folder" Command="{Binding OpenOutputsCommand}" Margin="0,0,18,6"/>
+                            <Button Style="{StaticResource FS.Button.Quiet}" Content="Open accepted design" Command="{Binding OpenAcceptedCommand}" Margin="0,0,18,6"/>
+                        </WrapPanel>
+                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Foreground="{DynamicResource FS.Ink3}" Margin="0,8,0,0">
+                            <Run Text="FAMILY STUDIO"/> <Run Text="{Binding Version, Mode=OneWay}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </Popup>
+
+            <!-- ============================== ISSUE REGISTER ============================== -->
+            <Popup x:Name="Register" Grid.Row="2" StaysOpen="False" Placement="Top" AllowsTransparency="True" PopupAnimation="Fade" HorizontalOffset="12">
+                <Border Style="{StaticResource FS.Card}" Width="460" MaxHeight="420" Margin="16,24,16,8">
+                    <DockPanel Margin="22,8,22,18">
+                        <ui:Caps DockPanel.Dock="Top" Style="{StaticResource Section}" Label="Issue register"/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding Activity}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{DynamicResource FS.Rule}" BorderThickness="0,0,0,1" Padding="0,7">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="52"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="11" Text="{Binding Time}" Foreground="{DynamicResource FS.Ink3}"/>
+                                                <TextBlock Grid.Column="1" x:Name="Line" Style="{StaticResource FS.Text}" FontSize="12" Text="{Binding Text}"/>
+                                                <TextBlock Grid.Column="2" Style="{StaticResource FS.Text.Mono}" FontSize="11" Text="{Binding Duration}" Foreground="{DynamicResource FS.Ink3}" Margin="12,0,0,0"/>
+                                            </Grid>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsError}" Value="True"><Setter TargetName="Line" Property="Foreground" Value="{DynamicResource FS.Danger}"/></DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+            </Popup>
+        </Grid>
+    </Border>
+</Window>
