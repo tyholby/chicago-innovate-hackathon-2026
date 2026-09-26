@@ -29,7 +29,7 @@ internal static class StudioLauncher
         var codex = new CodexService(new CodexOptions(environment.CodexHome, environment.CodexPath, environment.CodexWorkingDirectory, version)) { Journal = journal };
         var host = new RevitStudioHost(application, journal, environment.FurnitureTemplate);
         var session = new StudioSession(codex, host, journal);
-        var model = new StudioViewModel(codex, session, environment, version, application.Application.VersionNumber);
+        var model = new StudioViewModel(codex, session, environment, version);
 
         var window = new StudioWindow(model);
         new WindowInteropHelper(window) { Owner = application.MainWindowHandle };

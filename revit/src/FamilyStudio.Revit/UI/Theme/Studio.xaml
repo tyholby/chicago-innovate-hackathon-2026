@@ -347,7 +347,7 @@
     </Style>
 
     <!-- ===== Choices ========================================================================= -->
-    <!-- Sheet index: IF-001 BRIEF. The active sheet sits on a 2 px cut line. -->
+    <!-- Sheet index: BRIEF, REFERENCE, BUILD. The active sheet sits on a 2 px cut line. -->
     <Style x:Key="FS.SheetTab" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{DynamicResource FS.Ink3}"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -357,10 +357,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Grid Background="Transparent">
-                        <StackPanel VerticalAlignment="Center" Margin="0,2,0,0">
-                            <ui:Caps Label="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" FontFamily="{StaticResource FS.Font.Mono}" FontWeight="Normal" FontSize="10" Foreground="{TemplateBinding Foreground}"/>
-                            <ui:Caps Label="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" FontSize="12" Foreground="{TemplateBinding Foreground}" Margin="0,1,0,0"/>
-                        </StackPanel>
+                        <ui:Caps Label="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" FontSize="12" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center"/>
                         <Rectangle x:Name="Cut" Height="2" VerticalAlignment="Bottom" Fill="{DynamicResource FS.Ink}" Visibility="Hidden"/>
                     </Grid>
                     <ControlTemplate.Triggers>

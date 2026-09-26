@@ -69,21 +69,16 @@
                         <Path Data="M2,6.5 L11,11 L11,20.5 L2,16 Z" Fill="{DynamicResource FS.Accent}" Stroke="{DynamicResource FS.Ink}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
                         <Path Data="M11,11 L20,6.5 L20,16 L11,20.5 Z" Fill="{DynamicResource FS.Rule}" Stroke="{DynamicResource FS.Ink}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
                     </Canvas>
-                    <StackPanel VerticalAlignment="Center">
-                        <ui:Caps Label="Family Studio" FontSize="13" Foreground="{DynamicResource FS.Ink}"/>
-                        <TextBlock Style="{StaticResource FS.Text.Mono}" FontSize="10" Foreground="{DynamicResource FS.Ink3}">
-                            <Run Text="FOR REVIT"/> <Run Text="{Binding RevitVersion, Mode=OneWay}"/>
-                        </TextBlock>
-                    </StackPanel>
+                    <ui:Caps Label="Family Studio" FontSize="13" Foreground="{DynamicResource FS.Ink}" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="{Binding IsSignedIn, Converter={StaticResource Visible}}">
-                    <RadioButton Style="{StaticResource FS.SheetTab}" Content="Brief" Tag="IF-001" WindowChrome.IsHitTestVisibleInChrome="True"
+                    <RadioButton Style="{StaticResource FS.SheetTab}" Content="Brief" WindowChrome.IsHitTestVisibleInChrome="True"
                                  IsChecked="{Binding CurrentSheet, Converter={StaticResource Is}, ConverterParameter=Brief}"/>
-                    <RadioButton Style="{StaticResource FS.SheetTab}" Content="Reference" Tag="IF-201" WindowChrome.IsHitTestVisibleInChrome="True"
+                    <RadioButton Style="{StaticResource FS.SheetTab}" Content="Reference" WindowChrome.IsHitTestVisibleInChrome="True"
                                  IsEnabled="{Binding CanOpenReference}"
                                  IsChecked="{Binding CurrentSheet, Converter={StaticResource Is}, ConverterParameter=Reference}"/>
-                    <RadioButton Style="{StaticResource FS.SheetTab}" Content="Build" Tag="IF-901" WindowChrome.IsHitTestVisibleInChrome="True"
+                    <RadioButton Style="{StaticResource FS.SheetTab}" Content="Build" WindowChrome.IsHitTestVisibleInChrome="True"
                                  IsEnabled="{Binding CanOpenBuild}"
                                  IsChecked="{Binding CurrentSheet, Converter={StaticResource Is}, ConverterParameter=Build}"/>
                 </StackPanel>
@@ -143,7 +138,7 @@
                 </Canvas>
 
                 <StackPanel VerticalAlignment="Center" Margin="72,0,48,40" MaxWidth="560" HorizontalAlignment="Left">
-                    <ui:Caps Label="IF-000  Cover sheet" FontFamily="{StaticResource FS.Font.Mono}" FontWeight="Normal" FontSize="10"/>
+                    <ui:Caps Label="Cover sheet" FontSize="10"/>
                     <TextBlock Style="{StaticResource FS.Text.Display}" FontSize="40" LineHeight="46" Margin="0,18,0,0">
                         Words or a photo in.<LineBreak/>A native Revit family out.
                     </TextBlock>
@@ -219,7 +214,7 @@
                 <!-- ~~~~~ Drawing area ~~~~~ -->
                 <Grid Margin="28,24,28,20">
 
-                    <!-- IF-001 BRIEF, single item: the photo plate -->
+                    <!-- BRIEF, single item: the photo plate -->
                     <Grid Visibility="{Binding IsBriefSheet, Converter={StaticResource Visible}}">
                         <ContentControl Style="{StaticResource FS.Plate}" AllowDrop="True" Drop="OnPhotoDrop" DragOver="OnPhotoDragOver"
                                         ui:Studio.Checked="{Binding HasPhoto}" Visibility="{Binding IsSingle, Converter={StaticResource Visible}}">
@@ -249,7 +244,7 @@
                             </Grid>
                         </ContentControl>
 
-                        <!-- IF-001 BRIEF, collection: seven item cards and a finishes card -->
+                        <!-- BRIEF, collection: seven item cards and a finishes card -->
                         <Grid Visibility="{Binding IsCollection, Converter={StaticResource Visible}}">
                             <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
                             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
@@ -289,7 +284,7 @@
                         </Grid>
                     </Grid>
 
-                    <!-- IF-201 REFERENCE -->
+                    <!-- REFERENCE -->
                     <Grid Visibility="{Binding IsReferenceSheet, Converter={StaticResource Visible}}">
                         <Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <ContentControl Style="{StaticResource FS.Plate}" ui:Studio.Checked="True">
@@ -304,7 +299,7 @@
                         <ui:Caps Grid.Row="1" Label="{Binding ReferenceCaption}" FontFamily="{StaticResource FS.Font.Mono}" FontWeight="Normal" FontSize="10" Margin="10,8,0,0"/>
                     </Grid>
 
-                    <!-- IF-901 BUILD -->
+                    <!-- BUILD -->
                     <Grid Visibility="{Binding IsBuildSheet, Converter={StaticResource Visible}}">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <DockPanel Margin="10,0,10,10">
@@ -346,7 +341,7 @@
                 <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Background="{DynamicResource FS.Surface}">
                     <Grid Margin="28,6,28,28">
 
-                        <!-- IF-001 BRIEF -->
+                        <!-- BRIEF -->
                         <StackPanel Visibility="{Binding IsBriefSheet, Converter={StaticResource Visible}}" IsEnabled="{Binding CanEditBrief}">
                             <ui:Caps Style="{StaticResource Section}" Label="Brief"/>
                             <Border Style="{StaticResource FS.Segments}">
@@ -413,7 +408,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- IF-201 REFERENCE -->
+                        <!-- REFERENCE -->
                         <StackPanel Visibility="{Binding IsReferenceSheet, Converter={StaticResource Visible}}">
                             <StackPanel Visibility="{Binding IsSingle, Converter={StaticResource Visible}}" IsEnabled="{Binding CanEditReview}">
                                 <ui:Caps Style="{StaticResource Section}" Label="Family"/>
@@ -507,7 +502,7 @@
                                     HorizontalAlignment="Left" Margin="0,26,0,0" Visibility="{Binding IsSingle, Converter={StaticResource Visible}}"/>
                         </StackPanel>
 
-                        <!-- IF-901 BUILD -->
+                        <!-- BUILD -->
                         <StackPanel Visibility="{Binding IsBuildSheet, Converter={StaticResource Visible}}">
                             <ui:Caps Style="{StaticResource Section}" Label="Detail"/>
                             <Border Style="{StaticResource FS.Segments}" IsEnabled="{Binding IsBusy, Converter={StaticResource Is}, ConverterParameter=False}">
@@ -595,8 +590,6 @@
                         <ColumnDefinition Width="Auto" MinWidth="170"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- NOTE: the status line, and a redline note for input problems -->
@@ -627,18 +620,6 @@
                     </Border>
                     <Border Grid.Column="2" Style="{StaticResource Cell}">
                         <StackPanel VerticalAlignment="Center">
-                            <ui:Caps Label="Sheet" FontSize="9"/>
-                            <TextBlock Style="{StaticResource FS.Text.Mono}" Text="{Binding SheetNumber}" Margin="0,3,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Column="3" Style="{StaticResource Cell}">
-                        <StackPanel VerticalAlignment="Center">
-                            <ui:Caps Label="Scale" FontSize="9"/>
-                            <TextBlock Style="{StaticResource FS.Text.Mono}" Text="{Binding ScaleLabel}" Margin="0,3,0,0"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Column="4" Style="{StaticResource Cell}">
-                        <StackPanel VerticalAlignment="Center">
                             <ui:Caps Label="Status" FontSize="9"/>
                             <Border x:Name="Stamp" Margin="0,3,0,0" BorderThickness="1" CornerRadius="1" Padding="6,1" HorizontalAlignment="Left">
                                 <Border.Style>
@@ -657,7 +638,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="5" Style="{StaticResource Cell}" Padding="16,0,20,0">
+                    <Border Grid.Column="3" Style="{StaticResource Cell}" Padding="16,0,20,0">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Button Style="{StaticResource FS.Button.Quiet}" Content="Cancel" Command="{Binding CancelCommand}" Margin="0,0,18,0" VerticalAlignment="Center"
                                     Visibility="{Binding IsBusy, Converter={StaticResource Visible}}"/>

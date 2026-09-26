@@ -41,7 +41,7 @@ administrator rights are needed. `.\scripts\uninstall.ps1` removes the registrat
 
 ## Using it
 
-1. **IF-001 Brief.** The window opens on a complete example, a walnut lounge chair with its photo,
+1. **Brief.** The window opens on a complete example, a walnut lounge chair with its photo,
    name, size and finishes, so the whole flow can be tried straight away. For your own piece, click
    **New design** for a blank sheet (or edit the example) and/or drop a product photo on the plate.
    Add overall dimensions if you know them (650, 25.5 in or 2'-6" all work), or leave them blank and
@@ -50,10 +50,10 @@ administrator rights are needed. `.\scripts\uninstall.ps1` removes the registrat
    treatment bay) or start blank, and edit the room description, the seven items and four finishes.
 2. Click **Make reference** (or **Read the photo**). Family Studio writes a dimensioned brief and,
    without a photo, draws a reference image.
-3. **IF-201 Reference.** Check the name, dimensions and finishes; edit anything. Switch the stamp to
+3. **Reference.** Check the name, dimensions and finishes; edit anything. Switch the stamp to
    **Dimensions verified** only when the sizes come from a spec sheet or a tape measure: verified
    sizes must match the built family within 2 mm on every axis. Click **Accept design**.
-4. **IF-901 Build.** Choose *Concept* or *Refined* detail and click **Build family**. Family Studio
+4. **Build.** Choose *Concept* or *Refined* detail and click **Build family**. Family Studio
    plans the geometry, validates it, and builds it in a separate preview room, then shows native
    plan and 3D views. **Review** compares those views with the reference and repairs what does not
    match (up to two passes). For a single item, **Revise** takes a sentence ("lower the back by

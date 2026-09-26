@@ -44,13 +44,12 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
     private bool _populating;
     private bool _disposed;
 
-    public StudioViewModel(CodexService codex, StudioSession session, StudioEnvironment environment, string version, string revitVersion)
+    public StudioViewModel(CodexService codex, StudioSession session, StudioEnvironment environment, string version)
     {
         _codex = codex;
         _session = session;
         _environment = environment;
         Version = version;
-        RevitVersion = revitVersion;
 
         Items = new ObservableCollection<ItemCard>();
         CollectionMaterials = new ObservableCollection<MaterialNote>();
@@ -94,7 +93,6 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
     }
 
     public string Version { get; }
-    public string RevitVersion { get; }
 
     // ---- connection ------------------------------------------------------------------------
 
@@ -274,8 +272,6 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         set
         {
             if (!Set(ref _currentSheet, value)) return;
-            Raise(nameof(SheetNumber));
-            Raise(nameof(SheetName));
             Raise(nameof(IsBriefSheet));
             Raise(nameof(IsReferenceSheet));
             Raise(nameof(IsBuildSheet));
@@ -283,8 +279,6 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         }
     }
 
-    public string SheetNumber => CurrentSheet switch { Sheet.Brief => "IF-001", Sheet.Reference => "IF-201", _ => "IF-901" };
-    public string SheetName => CurrentSheet switch { Sheet.Brief => "Brief", Sheet.Reference => "Reference", _ => "Build" };
 
     public bool CanOpenReference => CanOpen(Sheet.Reference);
     public bool CanOpenBuild => CanOpen(Sheet.Build);

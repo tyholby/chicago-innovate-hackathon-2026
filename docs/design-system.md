@@ -35,17 +35,19 @@ The system is implemented twice from the same tokens:
 
 ## Sheets
 
-The three steps are sheets, numbered the way interior furnishings sheets are in a drawing set:
+The three steps are sheets, after a cover sheet. Tabs name them in words only: no sheet numbers,
+which read as codes to anyone outside a drawing office.
 
-| Sheet | Name | Drawing area | Schedule column |
-| --- | --- | --- | --- |
-| IF-000 | Cover | Sign in with ChatGPT | General notes: what is sent where |
-| IF-001 | Brief | The photo plate, or seven item cards and a finishes card | Name, general notes, overall dimensions, finishes |
-| IF-201 | Reference | The generated reference, or your photo | Family name, dimensions, the verified stamp, finish schedule |
-| IF-901 | Build | Native Revit views: plan, front left, front right | Detail level, families, revise, review, load into project |
+| Sheet | Drawing area | Schedule column |
+| --- | --- | --- |
+| Cover | Sign in with ChatGPT | General notes: what is sent where |
+| Brief | The photo plate, or seven item cards and a finishes card | Name, general notes, overall dimensions, finishes |
+| Reference | The generated reference, or your photo | Family name, dimensions, the verified stamp, finish schedule |
+| Build | Native Revit views: plan, front left, front right | Detail level, families, revise, review, load into project |
 
-The **title block** runs along the bottom of every sheet: a status note, then cells for family,
-sheet, scale and status, then the one primary action. A 1 px drafting line across its top edge
+The **title block** runs along the bottom of every sheet: a status note, then cells for the family
+and its status, then the one primary action. The header carries the mark and wordmark only, with no
+host or version line. A 1 px drafting line across its top edge
 carries a travelling ink stroke while Family Studio works.
 
 ## Tokens
@@ -94,8 +96,8 @@ All faces ship with Windows, so nothing is embedded or licensed.
 | Heading | Segoe UI Variable Text, SemiBold | 15 | |
 | Body | Segoe UI Variable Text | 13 / 19 | Secondary ink |
 | Small, help | Segoe UI Variable Text | 12 / 16 | Tertiary ink |
-| Label, tracked caps | Bahnschrift SemiCondensed, SemiBold | 11 | DIN 1451, the lettering of technical drawings. Title block, sheet numbers, section labels |
-| Figures | Cascadia Mono, then Consolas | 10 to 15 | Dimensions, sheet numbers, times, hex values |
+| Label, tracked caps | Bahnschrift SemiCondensed, SemiBold | 11 | DIN 1451, the lettering of technical drawings. Title block, sheet tabs, section labels |
+| Figures | Cascadia Mono, then Consolas | 10 to 15 | Dimensions, scales, times, hex values |
 
 WPF has no letter-spacing, so tracked capitals (`ui:Caps` in Revit, `Type.Caps` in Rhino) insert a
 hair space between letters: about 8 percent tracking at label sizes. Tracked capitals are never used
@@ -105,7 +107,7 @@ on buttons or body text.
 
 | Component | Key | Spec |
 | --- | --- | --- |
-| Sheet tab | `FS.SheetTab` | Sheet number in figures over a tracked name. Active: ink on a 2 px cut line |
+| Sheet tab | `FS.SheetTab` | The sheet's name in tracked capitals. Active: ink on a 2 px cut line |
 | Plate | `FS.Plate` | A figure framed by crop marks. Empty: a dashed construction border and one clear call to action |
 | Field | `FS.Field` | A baseline, not a box. Focus draws a 2 px cobalt cut line |
 | General notes | `FS.Notes` | A multi-line field on ruled lines, 22 px apart |
@@ -135,6 +137,6 @@ on buttons or body text.
 
 Arcol and Motif for warm paper and a single accent; Rayon for construction-line texture; Figma's UI3
 for keeping panels fixed and the canvas first; Shapr3D for keeping modes in fixed places; Autodesk's
-own Weave tokens for sitting comfortably inside Revit; ISO 128 line weights, NCS sheet numbering and
+own Weave tokens for sitting comfortably inside Revit; ISO 128 line weights and
 drafting conventions (dimension ticks, non-photo blue, redlines, title blocks) for the vocabulary;
 Dieter Rams and the Swiss grid for restraint.

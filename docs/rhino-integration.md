@@ -50,7 +50,7 @@ Never change the IDs: Rhino stores settings, panel layout and load state under t
 | --- | --- |
 | `FamilyStudioPlugin.cs` | `PlugInLoadTime.AtStartup`; registers the panel in `OnLoad` (a panel failure never blocks loading) |
 | `FamilyStudioCommand.cs` | Toggles the panel |
-| `HelloPanel.cs` | Eto `Panel` with one `Drawable`: the IF-000 cover sheet and a title block with setup status. Double-click re-reads settings; `RhinoApp.AppSettingsChanged` re-reads the theme |
+| `HelloPanel.cs` | Eto `Panel` with one `Drawable`: a cover sheet and a title block with setup status. Double-click re-reads settings; `RhinoApp.AppSettingsChanged` re-reads the theme |
 | `Theme.cs` | Paper and Night tokens and type roles, the same values as the Revit window. `HostUtils.RunningInDarkMode` picks one |
 | `EnvStatus.cs` | Reads `.env` beside the plug-in, then `%APPDATA%\FamilyStudio\.env`; reports presence only. Signed in means `auth.json` exists in the Codex home (`%LOCALAPPDATA%\FamilyStudio\codex-home` unless `OPENAI_CODEX_HOME` is set), the same folder the Revit add-in uses |
 | `PanelIcon.cs` | The Family Studio mark, drawn in code |

@@ -50,14 +50,12 @@ namespace FamilyStudio.Rhino
             const float margin = 20;
             var inner = Math.Max(120, width - 2 * margin);
 
-            // Header: mark, wordmark and sheet number.
+            // Header: mark and wordmark, centred on the mark.
             g.FillRectangle(t.Surface, 0, 0, width, 46);
             Mark(g, margin, 12, 22);
-            g.DrawText(Type.Label(9.5f), t.Ink, margin + 32, 11, Type.Caps("Family Studio"));
-            g.DrawText(Type.Mono(7.5f), t.Ink3, margin + 32, 27, "FOR RHINO 8");
-            var sheetFont = Type.Mono(8);
-            var sheetText = "IF-000";
-            g.DrawText(sheetFont, t.Ink3, width - margin - g.MeasureString(sheetFont, sheetText).Width, 18, sheetText);
+            var wordmark = Type.Label(9.5f);
+            var caps = Type.Caps("Family Studio");
+            g.DrawText(wordmark, t.Ink, margin + 32, 23 - g.MeasureString(wordmark, caps).Height / 2, caps);
             g.FillRectangle(t.Rule, 0, 46, width, 1);
 
             // The message.
@@ -76,12 +74,7 @@ namespace FamilyStudio.Rhino
             // Title block.
             g.FillRectangle(t.Surface, 0, titleBlockTop, width, height - titleBlockTop);
             g.FillRectangle(t.RuleStrong, 0, titleBlockTop, width, 1);
-            var third = inner / 3;
-            Cell(g, margin, titleBlockTop + 10, "Sheet", "IF-000", t.Ink, mono: true);
-            Cell(g, margin + third, titleBlockTop + 10, "Scale", "NTS", t.Ink, mono: true);
-            Cell(g, margin + 2 * third, titleBlockTop + 10, "Status", "Preliminary", t.Ink2, mono: false);
-            g.FillRectangle(t.Rule, margin + third - 8, titleBlockTop + 8, 1, 34);
-            g.FillRectangle(t.Rule, margin + 2 * third - 8, titleBlockTop + 8, 1, 34);
+            Cell(g, margin, titleBlockTop + 10, "Status", "Preliminary", t.Ink2, mono: false);
             g.FillRectangle(t.Rule, margin, titleBlockTop + 50, inner, 1);
 
             var row = titleBlockTop + 60;
