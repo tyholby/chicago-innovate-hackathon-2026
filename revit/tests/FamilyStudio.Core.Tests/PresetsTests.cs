@@ -1,3 +1,4 @@
+using FamilyStudio.Core.Model;
 using FamilyStudio.Core.Prompts;
 
 namespace FamilyStudio.Core.Tests;
@@ -11,8 +12,10 @@ public class PresetsTests
         Assert.True(draft.IsSingleItem);
         Assert.True(draft.IsComplete, "the example can run as is");
         Assert.Contains("lounge chair", draft.Assets[0]);
-        Assert.Null(draft.KnownSizeM); // the brief proposes the size
-        Assert.Empty(draft.Materials); // and the finishes
+        // Every field is filled, matching the brief of the example photo that ships with the add-in.
+        Assert.Equal("Walnut Lounge Chair", draft.AssetNames[0]);
+        Assert.Equal(new Vec3(0.76, 0.86, 0.80), draft.KnownSizeM);
+        Assert.Equal(2, draft.Materials.Length);
     }
 
     [Fact]

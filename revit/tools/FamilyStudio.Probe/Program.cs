@@ -80,7 +80,7 @@ static async Task<int> RunDesignAsync(CodexService codex, StudioEnvironment envi
 {
     var model = codex.Models.FirstOrDefault(m => m.Id == (options.Get("model") ?? environment.PreferredModel))
         ?? codex.Models.FirstOrDefault(m => m.IsDefault) ?? codex.Models.First();
-    var effort = options.Get("effort") ?? environment.PreferredEffort ?? (model.Efforts.Contains("high") ? "high" : model.DefaultEffort);
+    var effort = options.Get("effort") ?? environment.PreferredEffort ?? CodexModel.StartingEffort(model.Efforts, model.DefaultEffort);
     var fidelity = options.Get("fidelity") == "refined" ? Fidelity.Refined : Fidelity.Concept;
     var settings = new StageSettings(new ModelChoice(model.Id, effort), fidelity);
 

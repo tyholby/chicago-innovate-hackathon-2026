@@ -78,7 +78,8 @@ process dies, the last lines of its stderr are included in the error.
 - `account/read {refreshToken:false}`: signed in only when `account.type == "chatgpt"`.
 - `model/list` (paged): Family Studio offers models that are not hidden and accept image input, default
   first. Effort levels come from each model's `supportedReasoningEfforts`. The view model picks
-  `OPENAI_CODEX_MODEL` / `OPENAI_CODEX_REASONING_EFFORT` when set, otherwise the catalog default at "high".
+  `OPENAI_CODEX_MODEL` / `OPENAI_CODEX_REASONING_EFFORT` when set, otherwise the catalog default at "xhigh"
+  (then "high", then the model's own default, for models without it: `CodexModel.StartingEffort`).
 - Sign in: `account/login/start` with `{type:"chatgpt"}` returns `authUrl` (opened in the browser;
   Codex listens on localhost for the callback) or with `{type:"chatgptDeviceCode"}` returns
   `verificationUrl` and `userCode`. Completion arrives as the `account/login/completed` notification.

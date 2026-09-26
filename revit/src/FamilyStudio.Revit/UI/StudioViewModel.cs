@@ -89,7 +89,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
         _codex.StateChanged += OnBackgroundChange;
         _session.Changed += OnBackgroundChange;
-        LoadDraft(Presets.Create(Presets.SingleId)); // opens on the example chair, ready to run
+        LoadDraft(PresetDraft(Presets.SingleId)); // opens on the example chair (photo, name, size, finishes), ready to run
         Refresh();
     }
 
@@ -258,8 +258,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     private string PreferredEffort(ModelOption model) =>
         _environment.PreferredEffort is string wanted && model.Efforts.Contains(wanted) ? wanted
-        : model.Efforts.Contains("high") ? "high"
-        : model.DefaultEffort;
+        : CodexModel.StartingEffort(model.Efforts, model.DefaultEffort);
 
     private StageSettings Settings() => new(
         new ModelChoice(SelectedModel?.Id ?? throw new InvalidOperationException("Choose a model in Settings first."),
@@ -315,12 +314,23 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     private void SwitchMode(bool collection) => StartNew(collection ? SelectedPreset.Id : Presets.SingleId);
 
+    /// <summary>The single item example's photo, copied next to the add-in by the build.</summary>
+    private static readonly string ExamplePhoto = Path.Combine(
+        Path.GetDirectoryName(typeof(StudioViewModel).Assembly.Location)!, "Examples", "walnut-lounge-chair.jpg");
+
+    /// <summary>A preset's inputs. The single item example also gets its photo when the file is there.</summary>
+    private static StudioDraft PresetDraft(string presetId)
+    {
+        var draft = Presets.Create(presetId);
+        return presetId == Presets.SingleId && File.Exists(ExamplePhoto) ? draft with { ReferenceImagePath = ExamplePhoto } : draft;
+    }
+
     private void StartNew(string presetId, StudioDraft? draft = null)
     {
         try
         {
             _session.StartNew(CurrentDraft(), presetId);
-            LoadDraft(draft ?? Presets.Create(presetId));
+            LoadDraft(draft ?? PresetDraft(presetId));
             CurrentSheet = Sheet.Brief;
             Refresh();
         }

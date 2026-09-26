@@ -135,3 +135,13 @@ public class VersionAndImageTests
         Assert.Null(ReferenceImages.Measure(Encoding.ASCII.GetBytes("GIF89a......")));
     }
 }
+
+public class EffortTests
+{
+    [Theory]
+    [InlineData(new[] { "low", "medium", "high", "xhigh" }, "medium", "xhigh")]
+    [InlineData(new[] { "low", "medium", "high" }, "medium", "high")]
+    [InlineData(new[] { "minimal", "low" }, "low", "low")]
+    public void Starts_on_xhigh_then_high_then_the_model_default(string[] efforts, string modelDefault, string expected) =>
+        Assert.Equal(expected, CodexModel.StartingEffort(efforts, modelDefault));
+}

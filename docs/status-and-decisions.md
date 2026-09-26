@@ -38,17 +38,22 @@ following [local-install.md](local-install.md):
   succeeds, the **Family Studio** tab gets its **Design** panel and button, and `ThemeChanged` is
   registered.
 - The winget Codex CLI (`OpenAI.Codex`) runs (`codex-cli 0.157.1`), but it installs no `codex.exe`, so
-  Family Studio needs `OPENAI_CODEX_PATH`.
+  Family Studio needs `OPENAI_CODEX_PATH`. Launched that way from Revit, Codex starts for every window.
+- **Sign in with ChatGPT** from the window, through the browser, with Family Studio's own Codex home.
+- A complete single item in Revit, on the example chair as the window opens (photo, name, size and
+  finishes) at `xhigh` with `gpt-6-astra`: the photo read into a brief (42 s), acceptance, the preview
+  room, a recipe accepted on the first attempt (3.5 minutes), the family (`Walnut Lounge Chair.rfa`), its
+  placement, and the plan and both 3D captures.
 
 ### Not verified yet
 
-- **Anything inside Revit beyond loading, and anything in Rhino.** The Revit add-in loads (above), but its
-  window, sign-in and builds have not been run in Revit, and no Windows machine has run the Rhino
-  plug-in. See the checklist at the end of [revit-integration.md](revit-integration.md).
-- A completed in-app ChatGPT sign-in (browser and device code). Starting and cancelling one is
-  verified; finishing one needs a person at the browser.
+- **The rest of the Revit checklist, and anything in Rhino.** In Revit, not yet run: review and repair,
+  revise, **Save .rfa**, **Load into project**, collections, the Night theme and closing the preview room
+  while a build is queued. No Windows machine has run the Rhino plug-in. See the checklist at the end of
+  [revit-integration.md](revit-integration.md).
+- A completed device-code sign-in (the browser sign-in is verified on Windows, above).
 - A live collection run, and live review and repair (the probe builds without review).
-- The Windows Codex install locations in `CodexExecutable`, and `codex.exe` launched from Revit.
+- The Windows Codex install locations in `CodexExecutable`.
 
 ### Open items
 

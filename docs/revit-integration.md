@@ -26,6 +26,8 @@ files to `obj/<year>/` so the three years never share restore state. 2027 builds
   assemblies Revit has already loaded win. The add-in and the core therefore reference no NuGet packages
   and use only what .NET 8 ships.
 - **Settings.** `revit/.env`, when present, is copied next to the DLL at build time.
+- **Example photo.** `Examples/walnut-lounge-chair.jpg` is copied there too: the single item example
+  shows it on the plate.
 
 ## Registration
 

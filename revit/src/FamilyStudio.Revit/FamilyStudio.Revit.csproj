@@ -54,4 +54,9 @@
     <None Include="..\..\.env" Condition="Exists('..\..\.env')" Link=".env" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- The single item example's photo, shown on the plate when the window opens. -->
+  <ItemGroup>
+    <None Update="Examples\walnut-lounge-chair.jpg" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

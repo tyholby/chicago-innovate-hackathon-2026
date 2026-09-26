@@ -14,11 +14,13 @@ public static class Presets
 
     public static IReadOnlyList<Preset> All { get; } = new[]
     {
-        // The window opens on this example, so it never starts blank. Name, size and finishes are left
-        // for the brief to propose. New design clears it.
+        // The window opens on this example, so it never starts blank: the walnut lounge chair from a live run,
+        // with that brief's name, size and finishes. The add-in adds its photo (Examples/walnut-lounge-chair.jpg).
+        // New design clears it.
         new Preset(SingleId, "Single item", "One piece from words or a photo", new StudioDraft("",
             new[] { "A mid-century lounge chair: solid walnut frame with tapered legs, low slung seat and a reclined back, loose charcoal wool seat and back cushions, walnut armrests." },
-            Array.Empty<string>(), new[] { "" })),
+            new[] { "Solid walnut frame, legs and armrests", "Charcoal wool seat and back cushions" },
+            new[] { "Walnut Lounge Chair" }, KnownSizeM: new Vec3(0.76, 0.86, 0.80))),
         new Preset("blank", "Blank collection", "Seven items, four materials", StudioDraft.EmptyCollection()),
         new Preset("office", "Executive office", "Desk, seating, storage, lamp, rug, planter", new StudioDraft(
             "A calm executive office. Warm walnut, charcoal leather, brushed bronze and ivory. Architectural, " +
@@ -91,6 +93,6 @@ public static class Presets
     {
         var preset = All.FirstOrDefault(p => p.Id == id) ?? All[0];
         var d = preset.Draft;
-        return new(d.Style, d.Assets.ToArray(), d.Materials.ToArray(), d.AssetNames.ToArray());
+        return d with { Assets = d.Assets.ToArray(), Materials = d.Materials.ToArray(), AssetNames = d.AssetNames.ToArray() };
     }
 }

@@ -18,6 +18,10 @@ public sealed record CodexAccount(string? Email, string? Plan)
 
 public sealed record CodexModel(string Id, string DisplayName, string Description, bool IsDefault, string DefaultEffort, IReadOnlyList<string> Efforts)
 {
+    /// <summary>The effort Family Studio starts on when none is configured: xhigh, then high, then the model's own default.</summary>
+    public static string StartingEffort(IReadOnlyList<string> efforts, string defaultEffort) =>
+        efforts.Contains("xhigh") ? "xhigh" : efforts.Contains("high") ? "high" : defaultEffort;
+
     public override string ToString() => DisplayName;
 }
 
