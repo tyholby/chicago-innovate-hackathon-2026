@@ -111,7 +111,9 @@ wrong hash is rejected as stale. An answer that is not valid JSON is asked for a
 ## Presets
 
 `Core/Prompts/Presets.cs`: Single item, Blank collection, Executive office, Bedroom suite, Kitchen and
-Treatment bay. Choosing one only fills the inputs; nothing runs until the user asks.
+Treatment bay. Choosing one only fills the inputs; nothing runs until the user asks. Single item is an
+example, a mid-century lounge chair described in one sentence: the window opens on it and switching to
+single items returns to it, while **New design** gives a blank sheet in either mode.
 
 ## Changing prompts or output formats
 

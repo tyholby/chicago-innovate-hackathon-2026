@@ -41,9 +41,11 @@ administrator rights are needed. `.\scripts\uninstall.ps1` removes the registrat
 
 ## Using it
 
-1. **IF-001 Brief.** Choose *Single item*, then describe the piece and/or drop a product photo on
-   the plate. Add overall dimensions if you know them (650, 25.5 in or 2'-6" all work), or leave
-   them blank and Family Studio proposes a size. Finishes are optional, one per line.
+1. **IF-001 Brief.** The window opens on an example, a mid-century lounge chair, so the whole flow
+   can be tried straight away. For your own piece, rewrite the notes (or click **New design** for a
+   blank sheet) and/or drop a product photo on the plate. Add overall dimensions if you know them
+   (650, 25.5 in or 2'-6" all work), or leave them blank and Family Studio proposes a size. Finishes
+   are optional, one per line.
    For a room, choose *Collection of seven*, pick a starting point (office, bedroom suite, kitchen,
    treatment bay) or start blank, and edit the room description, the seven items and four finishes.
 2. Click **Make reference** (or **Read the photo**). Family Studio writes a dimensioned brief and,

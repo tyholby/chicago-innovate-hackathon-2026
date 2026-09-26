@@ -71,7 +71,8 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         SingleModeCommand = new Command(() => { if (IsCollection) SwitchMode(collection: false); }, () => CanStartNew);
         CollectionModeCommand = new Command(() => { if (!IsCollection) SwitchMode(collection: true); }, () => CanStartNew);
         UsePresetCommand = new Command(() => StartNew(SelectedPreset.Id), () => CanStartNew);
-        NewDesignCommand = new Command(() => StartNew(IsCollection ? "blank" : Presets.SingleId), () => CanStartNew);
+        // New design is a clean sheet in either mode; the examples are one click away in the mode switch and presets.
+        NewDesignCommand = new Command(() => StartNew(IsCollection ? "blank" : Presets.SingleId, IsCollection ? null : StudioDraft.EmptySingleItem()), () => CanStartNew);
         OpenAcceptedCommand = new Command(OpenAccepted, () => CanStartNew);
         AddFinishCommand = new Command(AddFinish, () => CanEditReview && Finishes.Count < StudioLimits.MaxMaterials);
         RemoveFinishCommand = new Command<FinishRow>(RemoveFinish, _ => CanEditReview && Finishes.Count > 1);
@@ -88,7 +89,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
         _codex.StateChanged += OnBackgroundChange;
         _session.Changed += OnBackgroundChange;
-        LoadDraft(StudioDraft.EmptySingleItem());
+        LoadDraft(Presets.Create(Presets.SingleId)); // opens on the example chair, ready to run
         Refresh();
     }
 
@@ -314,12 +315,12 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     private void SwitchMode(bool collection) => StartNew(collection ? SelectedPreset.Id : Presets.SingleId);
 
-    private void StartNew(string presetId)
+    private void StartNew(string presetId, StudioDraft? draft = null)
     {
         try
         {
             _session.StartNew(CurrentDraft(), presetId);
-            LoadDraft(Presets.Create(presetId));
+            LoadDraft(draft ?? Presets.Create(presetId));
             CurrentSheet = Sheet.Brief;
             Refresh();
         }

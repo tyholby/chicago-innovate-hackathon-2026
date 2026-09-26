@@ -14,7 +14,11 @@ public static class Presets
 
     public static IReadOnlyList<Preset> All { get; } = new[]
     {
-        new Preset(SingleId, "Single item", "One piece from words or a photo", StudioDraft.EmptySingleItem()),
+        // The window opens on this example, so it never starts blank. Name, size and finishes are left
+        // for the brief to propose. New design clears it.
+        new Preset(SingleId, "Single item", "One piece from words or a photo", new StudioDraft("",
+            new[] { "A mid-century lounge chair: solid walnut frame with tapered legs, low slung seat and a reclined back, loose charcoal wool seat and back cushions, walnut armrests." },
+            Array.Empty<string>(), new[] { "" })),
         new Preset("blank", "Blank collection", "Seven items, four materials", StudioDraft.EmptyCollection()),
         new Preset("office", "Executive office", "Desk, seating, storage, lamp, rug, planter", new StudioDraft(
             "A calm executive office. Warm walnut, charcoal leather, brushed bronze and ivory. Architectural, " +
