@@ -35,7 +35,7 @@ public partial class StudioWindow : Window
         Close();
     }
 
-    private void OnThemeChanged() => Dispatcher.BeginInvoke(new Action(() => ThemeManager.Apply(this)));
+    private void OnThemeChanged(bool dark) => Dispatcher.BeginInvoke(new Action(() => ThemeManager.Apply(this, dark)));
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {

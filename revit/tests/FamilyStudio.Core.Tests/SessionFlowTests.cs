@@ -51,7 +51,8 @@ public class SessionFlowTests : IDisposable
         private readonly Dictionary<string, FamilyReceipt> _families = new();
         private readonly Dictionary<string, InstanceReceipt> _instances = new();
         private long _stamp;
-        public event Action? DocumentUnavailable { add { } remove { } }
+        public bool Misplace;
+        public event Action? DocumentUnavailable;
         public Task WhenIdle => Task.CompletedTask;
         public void BindDesign(StudioBrief brief) { _brief = brief; _families.Clear(); _instances.Clear(); }
         public Task<NativeSnapshot> EnsureRoomAsync(CancellationToken cancellationToken) => Task.FromResult(Snapshot());
@@ -62,7 +63,10 @@ public class SessionFlowTests : IDisposable
             foreach (var r in proposal.Recipes)
                 _families[r.AssetId] = new FamilyReceipt(r.AssetId, r.AssetId, "t", "x.rfa", r.AssetId, r.AssetId, r.Parts.Length, RecipeRules.Validate(r, _brief!).Size, 1);
             foreach (var p in proposal.Placements)
-                _instances[p.Key] = new InstanceReceipt(p.Key, p.AssetId, p.Key, p.PositionM, p.RotationDegrees, p.PositionM, p.PositionM);
+            {
+                var at = Misplace ? p.PositionM + new Vec3(0, 0, 0.1) : p.PositionM;
+                _instances[p.Key] = new InstanceReceipt(p.Key, p.AssetId, p.Key, at, p.RotationDegrees, at, at);
+            }
             _stamp++;
             return Task.FromResult(Snapshot());
         }
@@ -75,6 +79,16 @@ public class SessionFlowTests : IDisposable
         public Task ShowRoomAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task CloseAsync() => Task.CompletedTask;
         public void Dispose() { }
+
+        /// <summary>The user closes the preview room document.</summary>
+        public void CloseRoom()
+        {
+            _families.Clear();
+            _instances.Clear();
+            _stamp = 0;
+            DocumentUnavailable?.Invoke();
+        }
+
         private NativeSnapshot Snapshot() => new("room", "Room", _families.Values.ToArray(), _instances.Values.ToArray(), Array.Empty<CaptureReceipt>(), _stamp);
     }
 
@@ -168,6 +182,57 @@ public class SessionFlowTests : IDisposable
         await session.GenerateAsync(StoolDraft(), Settings);
         var edited = StoolDraft() with { Assets = new[] { "A three-legged stool" } };
         Assert.Throws<InvalidOperationException>(() => session.Accept(edited));
+    }
+
+    [Fact]
+    public async Task Sizes_shown_to_a_tenth_of_a_millimetre_still_match_the_inputs()
+    {
+        var (session, agent, _) = Create();
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(Samples.StoolBrief()) });
+        await session.GenerateAsync(StoolDraft(new Vec3(25.5 * 0.0254, 20.2 * 0.0254, 30.3 * 0.0254)), Settings); // typed in inches
+        Assert.Throws<InvalidOperationException>(() => session.Accept(StoolDraft(new Vec3(0.6487, 0.5131, 0.7696)))); // 1 mm wider
+        session.Accept(StoolDraft(new Vec3(0.6477, 0.5131, 0.7696))); // as a reopened design shows it
+        Assert.True(session.IsAccepted);
+    }
+
+    [Fact]
+    public async Task Closing_the_preview_room_keeps_the_recipes_for_the_next_build()
+    {
+        var (session, agent, host) = Create();
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(Samples.StoolBrief()) });
+        agent.Script["recipe-a1"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(new RecipeDraft("a1", Samples.StoolParts())) });
+        var draft = StoolDraft();
+        await session.GenerateAsync(draft, Settings);
+        session.Accept(draft);
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+
+        var seen = new List<(StudioState State, bool HasFamilies)>();
+        session.Changed += () => seen.Add((session.State, session.HasFamilies));
+        host.CloseRoom();
+        Assert.Equal(StudioState.DocumentUnavailable, session.State);
+        Assert.False(session.HasFamilies);
+        Assert.DoesNotContain(seen, s => s.State == StudioState.DocumentUnavailable && s.HasFamilies);
+        session.Cancel(); // nothing is running: a no-op
+
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+        Assert.Equal(StudioState.Built, session.State);
+        Assert.Equal(1, agent.Requests.Count(r => r.Name == "recipe-a1"));
+        Assert.Equal(2, host.Applied.Count);
+    }
+
+    [Fact]
+    public async Task An_instance_Revit_puts_elsewhere_fails_the_build()
+    {
+        var (session, agent, host) = Create();
+        agent.Script["brief"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(Samples.StoolBrief()) });
+        agent.Script["recipe-a1"] = new(new Func<StageRequest, string>[] { _ => StudioJson.Write(new RecipeDraft("a1", Samples.StoolParts())) });
+        var draft = StoolDraft();
+        await session.GenerateAsync(draft, Settings);
+        session.Accept(draft);
+        host.Misplace = true;
+        await session.BuildAsync(Settings, reviewAfterBuild: false);
+        Assert.Equal(StudioState.Error, session.State);
+        Assert.Contains("away from its planned position", session.Status);
     }
 
     [Fact]

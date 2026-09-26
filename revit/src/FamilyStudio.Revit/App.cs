@@ -10,8 +10,8 @@ public sealed class App : IExternalApplication
 {
     public const string TabName = "Family Studio";
 
-    /// <summary>Raised when Revit's UI theme changes (not the canvas theme).</summary>
-    internal static event Action? UiThemeChanged;
+    /// <summary>Raised when Revit's UI theme changes (not the canvas theme), with true when it is now dark.</summary>
+    internal static event Action<bool>? UiThemeChanged;
 
     public Result OnStartup(UIControlledApplication application)
     {
@@ -41,7 +41,8 @@ public sealed class App : IExternalApplication
 
     private static void OnThemeChanged(object? sender, ThemeChangedEventArgs args)
     {
-        if (args.ThemeChangedType == ThemeType.UITheme) UiThemeChanged?.Invoke();
+        // Read the theme here, inside Revit's event: listeners apply it later, outside the API context.
+        if (args.ThemeChangedType == ThemeType.UITheme) UiThemeChanged?.Invoke(UI.ThemeManager.RevitIsDark);
     }
 }
 

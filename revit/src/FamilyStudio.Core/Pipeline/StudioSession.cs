@@ -65,7 +65,7 @@ public sealed class StudioSession : IDisposable
     public ReferenceImage? Reference { get; private set; }
     public NativeSnapshot? Snapshot { get; private set; }
     public ReviewReport? LastReview { get; private set; }
-    public bool IsBusy => _operation is not null;
+    public bool IsBusy => Volatile.Read(ref _operation) is not null;
     public bool IsAccepted => _accepted is not null;
     public bool HasFamilies => Snapshot?.Families.Length > 0;
     public IReadOnlyList<ActivityEntry> Activity { get { lock (_activity) return _activity.ToArray(); } }
@@ -148,7 +148,7 @@ public sealed class StudioSession : IDisposable
     {
         if (IsBusy || State != StudioState.Review || Reference is null || Brief is null)
             throw new InvalidOperationException("Prepare and review a design before accepting it.");
-        if (_generatedFrom is null || StudioJson.Write(currentDraft) != StudioJson.Write(_generatedFrom))
+        if (_generatedFrom is null || !currentDraft.SameInputs(_generatedFrom))
             throw new InvalidOperationException("The inputs changed after this reference was made. Prepare the design again to use them.");
         _accepted = new AcceptedDesign(Brief, Reference);
         _host.BindDesign(_accepted.Brief);
@@ -216,7 +216,7 @@ public sealed class StudioSession : IDisposable
         var design = _accepted ?? throw new InvalidOperationException("Accept the design before building.");
         design.Verify();
         var brief = design.Brief;
-        if (_fidelity != settings.Fidelity || _plannedWith != settings.Model) { _planned.Clear(); _fidelity = settings.Fidelity; }
+        if (_fidelity != settings.Fidelity || _plannedWith != settings.Model) { _planned.Clear(); _intents = null; _fidelity = settings.Fidelity; }
         _plannedWith = settings.Model;
 
         SetState(StudioState.Building, "Opening the preview room in Revit...");
@@ -245,9 +245,14 @@ public sealed class StudioSession : IDisposable
             }
             else
             {
-                SetState(StudioState.Building, "Arranging the collection in the preview room...");
-                var plan = await Timed("Layout validated", () => PlanLayoutAsync(brief, recipes, design.Reference, settings, token));
-                _intents = plan;
+                // A layout survives a closed preview room, like the recipes it was planned for.
+                var plan = _intents;
+                if (plan is null)
+                {
+                    SetState(StudioState.Building, "Arranging the collection in the preview room...");
+                    plan = await Timed("Layout validated", () => PlanLayoutAsync(brief, recipes, design.Reference, settings, token));
+                    _intents = plan;
+                }
                 SetState(StudioState.Building, "Building the families in Revit...");
                 await Timed("Families built in Revit", () => ApplyAsync(new BuildProposal(recipes, new PlacementResolver(plan, recipes).Resolve()), brief, token));
             }
@@ -314,7 +319,12 @@ public sealed class StudioSession : IDisposable
 
     public Task ShowRoomAsync() => _host.ShowRoomAsync(CancellationToken.None);
 
-    public void Cancel() => _operation?.Cancel();
+    /// <summary>Cancels the running operation, if any. Safe from any thread, even as the operation ends.</summary>
+    public void Cancel()
+    {
+        try { Volatile.Read(ref _operation)?.Cancel(); }
+        catch (ObjectDisposedException) { /* the operation finished meanwhile */ }
+    }
 
     // ---- planning helpers -------------------------------------------------------------------
 
@@ -359,6 +369,13 @@ public sealed class StudioSession : IDisposable
         foreach (var asset in brief.Assets)
             if (!Snapshot.Families.Any(f => f.AssetId == asset.Id) || Snapshot.Instances.Count(i => i.AssetId == asset.Id) != asset.Quantity)
                 throw new InvalidOperationException($"Revit's model is missing {asset.Name}. Build again to continue.");
+        // Measure the placements back, like the families: Revit must have put every instance where it was planned.
+        foreach (var placement in complete.Placements)
+        {
+            var instance = Snapshot.Instances.SingleOrDefault(i => i.Key == placement.Key);
+            if (instance is null || !SamePlace(instance, placement))
+                throw new InvalidOperationException($"Revit placed {brief.Assets.Single(a => a.Id == placement.AssetId).Name} away from its planned position. Build again to continue.");
+        }
         Journal.Write("native_build", new { Snapshot.DocumentKey, families = Snapshot.Families.Length, instances = Snapshot.Instances.Length, overlaps });
         if (_intents is not null) Journal.Artifact("placement-intents.json", StudioJson.Write(_intents));
         Changed?.Invoke();
@@ -467,14 +484,23 @@ public sealed class StudioSession : IDisposable
     private static bool IsSingleFreestanding(StudioBrief brief) =>
         brief.Assets is [{ Quantity: 1, FloorStanding: true }];
 
+    private static bool SamePlace(InstanceReceipt instance, Placement placement)
+    {
+        var offset = instance.PositionM - placement.PositionM;
+        var turn = Math.Abs(instance.RotationDegrees - placement.RotationDegrees) % 360;
+        return Math.Abs(offset.X) <= RecipeRules.ContainmentToleranceM && Math.Abs(offset.Y) <= RecipeRules.ContainmentToleranceM &&
+               Math.Abs(offset.Z) <= RecipeRules.ContainmentToleranceM && Math.Min(turn, 360 - turn) <= 0.1;
+    }
+
     // ---- operation plumbing ---------------------------------------------------------------
 
     private Task RunOperation(string name, Func<CancellationToken, Task> action, bool keepState = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_operation is not null) throw new InvalidOperationException("Family Studio is already working. Wait for it to finish, or cancel.");
-        _operation = new CancellationTokenSource();
-        _running = RunCoreAsync(name, action, _operation, keepState);
+        if (IsBusy) throw new InvalidOperationException("Family Studio is already working. Wait for it to finish, or cancel.");
+        var operation = new CancellationTokenSource();
+        Volatile.Write(ref _operation, operation);
+        _running = RunCoreAsync(name, action, operation, keepState);
         return _running;
     }
 
@@ -509,8 +535,8 @@ public sealed class StudioSession : IDisposable
         }
         finally
         {
+            Volatile.Write(ref _operation, null);
             operation.Dispose();
-            _operation = null;
             Changed?.Invoke();
         }
     }
@@ -586,9 +612,15 @@ public sealed class StudioSession : IDisposable
     private void OnDocumentUnavailable()
     {
         if (_accepted is null) return;
-        SetState(StudioState.DocumentUnavailable, "The preview room was closed. Build again to open a new one.");
-        ResetBuild();
+        // Forget the room before announcing it, so listeners never see families that are gone.
+        // Validated recipes and the layout stay: building again needs no new planning.
+        if (_built is not null)
+            foreach (var recipe in _built.Recipes) _planned[recipe.AssetId] = recipe;
+        _built = null;
+        Snapshot = null;
+        LastReview = null;
         _host.BindDesign(_accepted.Brief);
+        SetState(StudioState.DocumentUnavailable, "The preview room was closed. Build again to open a new one.");
         Cancel();
     }
 

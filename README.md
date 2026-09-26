@@ -13,7 +13,7 @@ This is a monorepo with one folder per host application:
 | --- | --- | --- |
 | [`revit/`](revit/) | Family Studio for Revit 2025, 2026 and 2027 | Working: single items and seven-item collections |
 | [`rhino/`](rhino/) | Family Studio for Rhino 8 | Scaffold: a hello-world panel in the same design language |
-| [`docs/`](docs/) | [The design system](docs/design-system.md) shared by both | |
+| [`docs/`](docs/) | [The design system](docs/design-system.md) shared by both, and engineering docs | Coding agents start at [AGENTS.md](AGENTS.md) |
 
 ## Quick start (Windows)
 
@@ -32,7 +32,7 @@ git and never committed.
 - **OpenAI (ChatGPT through Codex).** Nothing to paste: sign in from the plugin window and Codex keeps
   the sign-in refreshed in `%LOCALAPPDATA%\FamilyStudio\codex-home`. Set `OPENAI_CODEX_HOME` to reuse
   another Codex sign-in, such as `%USERPROFILE%\.codex`.
-- **OpenRouter.** `OPENROUTER_API_KEY` is read by both plugins and reserved for upcoming features.
+- **OpenRouter.** `OPENROUTER_API_KEY` is read by both plugins and reserved for features in development.
 
 ## License
 

@@ -12,6 +12,7 @@ namespace FamilyStudio.Revit;
 internal static class StudioLauncher
 {
     private static StudioWindow? _window;
+    private static bool _revitClosing;
 
     public static void Open(UIApplication application)
     {
@@ -36,7 +37,16 @@ internal static class StudioLauncher
         {
             _window = null;
             model.Dispose();
-            _ = session.StopAsync().ContinueWith(_ => codex.Dispose(), TaskScheduler.Default);
+            session.Cancel();
+            codex.Dispose(); // stops both app-server processes now; nothing needs them once the window is gone
+            if (_revitClosing)
+            {
+                // Revit runs no more external events once it is shutting down, so release the host
+                // right here, in OnShutdown's API context, instead of queueing the release.
+                session.Dispose();
+                host.Dispose();
+            }
+            else _ = session.StopAsync(); // cancels, lets queued Revit work settle, then releases the host
         };
         _window = window;
         window.Show();
@@ -48,6 +58,7 @@ internal static class StudioLauncher
     /// <summary>Revit is closing: stop Codex immediately so no app-server process outlives Revit.</summary>
     public static void Shutdown()
     {
+        _revitClosing = true;
         var window = _window;
         _window = null;
         window?.CloseForShutdown();

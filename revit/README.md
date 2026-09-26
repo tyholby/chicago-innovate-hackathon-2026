@@ -81,7 +81,7 @@ All settings live in `revit/.env` (copied next to the add-in at build time) or
 - `OPENAI_CODEX_PATH` points at `codex.exe` if it is somewhere unusual.
 - `OPENAI_CODEX_MODEL` and `OPENAI_CODEX_REASONING_EFFORT` choose the defaults; the settings menu
   (click your account name) lists every model your plan offers.
-- `OPENROUTER_API_KEY` is reserved for upcoming features. The settings menu can check that it works.
+- `OPENROUTER_API_KEY` is reserved for features in development. The settings menu can check that it works.
 
 ## How it works
 

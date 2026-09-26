@@ -22,7 +22,8 @@ internal sealed class RevitStudioHost : IStudioHost
         public string Key { get; } = key;
         public Document Document { get; } = document;
         public bool Available { get; set; } = true;
-        public Dictionary<string, string> LoadedFamilies { get; } = new(StringComparer.Ordinal); // family name -> unique id
+        /// <summary>Families Family Studio loaded here: family unique id to the preview room and item it came from.</summary>
+        public Dictionary<string, string> LoadedFamilies { get; } = new(StringComparer.Ordinal);
     }
 
     private readonly UIApplication _application;
@@ -43,6 +44,7 @@ internal sealed class RevitStudioHost : IStudioHost
     private long _changeStamp;
     private bool _needsNewRoom;
     private bool _roomUnavailable;
+    private int? _roomClosingId;
     private bool _disposed;
     private CaptureReceipt[] _captures = Array.Empty<CaptureReceipt>();
 
@@ -56,6 +58,7 @@ internal sealed class RevitStudioHost : IStudioHost
         _templateOverride = templateOverride;
         _dispatcher = new RevitDispatcher(application);
         _application.Application.DocumentClosing += OnDocumentClosing;
+        _application.Application.DocumentClosed += OnDocumentClosed;
         _application.Application.DocumentChanged += OnDocumentChanged;
     }
 
@@ -225,7 +228,8 @@ internal sealed class RevitStudioHost : IStudioHost
                 var asset = brief.Assets.Single(a => a.Id == recipe.AssetId);
                 var name = UniqueFamilyName(brief, asset);
                 var revision = families.TryGetValue(asset.Id, out var previous) ? previous.Revision + 1 : 1;
-                var path = _journal.PathFor("families", asset.Id, $"revision-{revision:D2}", name + ".rfa");
+                // Each preview room numbers its revisions from 1, so its files get their own folder.
+                var path = _journal.PathFor("families", $"preview-{_roomCount}", asset.Id, $"revision-{revision:D2}", name + ".rfa");
                 var built = FamilyBuilder.Create(app.Application, path, name, recipe, brief, _templateOverride);
 
                 using var load = new Transaction(room, $"Family Studio: load {name}");
@@ -253,16 +257,17 @@ internal sealed class RevitStudioHost : IStudioHost
                     var target = Units.Point(placement.PositionM);
                     FamilyInstance instance;
                     if (instances.TryGetValue(placement.Key, out var existing))
-                    {
                         instance = room.GetElement(existing.UniqueId) as FamilyInstance
                             ?? throw new StudioDocumentException($"Instance {placement.Key} was deleted from the preview room.");
-                        ElementTransformUtils.MoveElement(room, instance.Id, target - ((LocationPoint)instance.Location).Point);
-                    }
                     else
                     {
                         instance = room.Create.NewFamilyInstance(target, (FamilySymbol)room.GetElement(receipt.SymbolUniqueId), level, StructuralType.NonStructural);
                         instances[placement.Key] = (instance.UniqueId, placement.AssetId);
+                        room.Regenerate();
                     }
+                    // The level-based overload can drop the height (a lamp on a desk would land on the floor), so move to the target in 3D.
+                    var offset = target - ((LocationPoint)instance.Location).Point;
+                    if (!offset.IsZeroLength()) ElementTransformUtils.MoveElement(room, instance.Id, offset);
                     room.Regenerate();
                     var turn = Normalize(placement.RotationDegrees * Math.PI / 180 - ((LocationPoint)instance.Location).Rotation);
                     if (Math.Abs(turn) > 1e-9)
@@ -340,11 +345,12 @@ internal sealed class RevitStudioHost : IStudioHost
 
     private void LoadFamilies(string projectKey, IReadOnlyList<string> assetIds, CancellationToken cancellationToken)
     {
+        // Problems with the chosen project are not preview room problems, so they are not StudioDocumentExceptions.
         var binding = _projects.SingleOrDefault(p => p.Key == projectKey && p.Available)
-            ?? throw new StudioDocumentException("Choose an open project to load into.");
+            ?? throw new InvalidOperationException("That project is no longer open. Choose an open project to load into.");
         var target = binding.Document;
         if (!target.IsValidObject || target.IsReadOnly || target.IsFamilyDocument)
-            throw new StudioDocumentException("That project can no longer accept families. Choose another one.");
+            throw new InvalidOperationException("That project can no longer accept families. Choose another one.");
         if (assetIds.Count == 0) throw new ArgumentException("Choose at least one family to load.");
 
         using var group = new TransactionGroup(target, "Family Studio: load families");
@@ -353,14 +359,19 @@ internal sealed class RevitStudioHost : IStudioHost
         {
             cancellationToken.ThrowIfCancellationRequested();
             var receipt = _families.TryGetValue(assetId, out var r) ? r : throw new ArgumentException("That family has not been built yet.");
-            var path = receipt.RfaPath;
-            var existing = new FilteredElementCollector(target).OfClass(typeof(Family)).Cast<Family>().SingleOrDefault(f => f.Name == receipt.FamilyName);
-            if (existing is not null && !(binding.LoadedFamilies.TryGetValue(receipt.FamilyName, out var owned) && owned == existing.UniqueId))
-            {
-                // Never overwrite someone else's family: load ours under the next free name instead.
-                var name = receipt.FamilyName;
-                for (var i = 2; new FilteredElementCollector(target).OfClass(typeof(Family)).Cast<Family>().Any(f => f.Name == name); i++)
+            var owner = $"{_roomKey}/{assetId}";
+            var families = new FilteredElementCollector(target).OfClass(typeof(Family)).Cast<Family>().ToArray();
+            // Reload in place only what this design loaded here before. Any other family with the
+            // same name (the user's own, or one from an earlier design) is never overwritten: ours
+            // loads under the next free name instead.
+            var name = families.FirstOrDefault(f => binding.LoadedFamilies.TryGetValue(f.UniqueId, out var o) && o == owner)?.Name
+                ?? receipt.FamilyName;
+            if (families.Any(f => f.Name == name && !(binding.LoadedFamilies.TryGetValue(f.UniqueId, out var o) && o == owner)))
+                for (var i = 2; families.Any(f => f.Name == name); i++)
                     name = $"{receipt.FamilyName} {i}";
+            var path = receipt.RfaPath;
+            if (name != receipt.FamilyName)
+            {
                 path = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(receipt.RfaPath)!, name + ".rfa");
                 File.Copy(receipt.RfaPath, path, overwrite: true);
             }
@@ -371,7 +382,7 @@ internal sealed class RevitStudioHost : IStudioHost
                     .SingleOrDefault(f => f.Name == System.IO.Path.GetFileNameWithoutExtension(path))
                     ?? throw new InvalidOperationException("Revit did not load the family.");
             Commit(load);
-            binding.LoadedFamilies[family.Name] = family.UniqueId;
+            binding.LoadedFamilies[family.UniqueId] = owner;
         }
         if (group.Assimilate() != TransactionStatus.Committed) throw new InvalidOperationException("Revit did not commit the load.");
         _journal.Write("families_loaded", new { target = target.Title, assetIds });
@@ -412,7 +423,15 @@ internal sealed class RevitStudioHost : IStudioHost
     private void OnDocumentClosing(object? sender, DocumentClosingEventArgs args)
     {
         foreach (var project in _projects.Where(p => Same(p.Document, args.Document))) project.Available = false;
-        if (!Same(args.Document, _room)) return;
+        // Closing can still be cancelled (by the user or another add-in); DocumentClosed says whether it happened.
+        if (Same(args.Document, _room)) _roomClosingId = args.DocumentId;
+    }
+
+    private void OnDocumentClosed(object? sender, DocumentClosedEventArgs args)
+    {
+        if (_roomClosingId != args.DocumentId) return;
+        _roomClosingId = null;
+        if (args.Status != RevitAPIEventStatus.Succeeded) return;
         _roomUnavailable = true;
         _needsNewRoom = true;
         _journal.Write("room_closed", new { roomKey = _roomKey });
@@ -441,6 +460,7 @@ internal sealed class RevitStudioHost : IStudioHost
         if (_disposed) return;
         _disposed = true;
         _application.Application.DocumentClosing -= OnDocumentClosing;
+        _application.Application.DocumentClosed -= OnDocumentClosed;
         _application.Application.DocumentChanged -= OnDocumentChanged;
         _dispatcher.Dispose();
     }

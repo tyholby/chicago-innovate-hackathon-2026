@@ -40,10 +40,10 @@ public sealed class CodexService : IStudioAgent
     private readonly SemaphoreSlim _stageGate = new(1, 1);
     private readonly Dictionary<CodexProfile, CodexProcess> _processes = new();
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly object _signInGate = new();
     private IReadOnlySet<string>? _features;
     private string[] _disabledMcpServers = Array.Empty<string>();
-    private TaskCompletionSource<SignInOutcome>? _signIn;
-    private string? _signInId;
+    private PendingSignIn? _signIn;
     private ActiveStage? _active;
     private bool _disposed;
 
@@ -67,9 +67,15 @@ public sealed class CodexService : IStudioAgent
     /// <summary>Finds Codex, starts the reasoning process, and reads the account and model catalog.</summary>
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        var process = await EnsureProcessAsync(CodexProfile.Reasoning, cancellationToken).ConfigureAwait(false);
         await RefreshAccountAsync(cancellationToken).ConfigureAwait(false);
-        if (Models.Count == 0) Models = await ReadModelsAsync(process, cancellationToken).ConfigureAwait(false);
+        await RefreshModelsAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads the model catalog again. The catalog can depend on the account, so this runs after every sign-in.</summary>
+    public async Task RefreshModelsAsync(CancellationToken cancellationToken)
+    {
+        var process = await EnsureProcessAsync(CodexProfile.Reasoning, cancellationToken).ConfigureAwait(false);
+        Models = await ReadModelsAsync(process, cancellationToken).ConfigureAwait(false);
         StateChanged?.Invoke();
     }
 
@@ -83,28 +89,57 @@ public sealed class CodexService : IStudioAgent
         return Account;
     }
 
-    /// <summary>Starts "Sign in with ChatGPT". The browser flow returns a URL to open; the device flow returns a code.</summary>
+    /// <summary>A sign-in Codex is running. Its ID arrives with Codex's answer to account/login/start.</summary>
+    private sealed class PendingSignIn
+    {
+        public string? Id;
+        public readonly TaskCompletionSource<SignInOutcome> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    /// <summary>
+    /// Starts "Sign in with ChatGPT". The browser flow returns a URL to open; the device flow returns a code.
+    /// Starting a new sign-in cancels the one in progress.
+    /// </summary>
     public async Task<SignInAttempt> BeginSignInAsync(bool deviceCode, CancellationToken cancellationToken)
     {
         var process = await EnsureProcessAsync(CodexProfile.Reasoning, cancellationToken).ConfigureAwait(false);
-        if (_signInId is not null) await CancelSignInAsync().ConfigureAwait(false);
-        var completion = new TaskCompletionSource<SignInOutcome>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _signIn = completion;
-        var response = await process.Rpc.CallAsync("account/login/start",
-            deviceCode ? new { type = "chatgptDeviceCode" } : new { type = "chatgpt" }, cancellationToken).ConfigureAwait(false);
-        _signInId = response.Str("loginId") ?? throw new StudioProtocolException("Codex did not start a sign-in.");
-        Journal?.Write("sign_in_started", new { deviceCode });
-        return new SignInAttempt(_signInId, response.Str("authUrl"), response.Str("verificationUrl"), response.Str("userCode"), completion.Task);
+        await CancelSignInAsync().ConfigureAwait(false);
+        var pending = new PendingSignIn();
+        lock (_signInGate) _signIn = pending;
+        try
+        {
+            var response = await process.Rpc.CallAsync("account/login/start",
+                deviceCode ? new { type = "chatgptDeviceCode" } : new { type = "chatgpt" }, cancellationToken).ConfigureAwait(false);
+            var id = response.Str("loginId") ?? throw new StudioProtocolException("Codex did not start a sign-in.");
+            bool replaced;
+            lock (_signInGate) { pending.Id = id; replaced = !ReferenceEquals(_signIn, pending); }
+            if (replaced) await CancelLoginAsync(process, id).ConfigureAwait(false); // a newer sign-in started meanwhile
+            Journal?.Write("sign_in_started", new { deviceCode });
+            return new SignInAttempt(id, response.Str("authUrl"), response.Str("verificationUrl"), response.Str("userCode"), pending.Completion.Task);
+        }
+        catch (Exception ex)
+        {
+            lock (_signInGate) if (ReferenceEquals(_signIn, pending)) _signIn = null;
+            pending.Completion.TrySetResult(new SignInOutcome(false, ex.Message));
+            throw;
+        }
     }
 
     public async Task CancelSignInAsync()
     {
-        var id = _signInId;
-        _signInId = null;
-        _signIn?.TrySetResult(new SignInOutcome(false, "Sign-in cancelled."));
-        if (id is null || !_processes.TryGetValue(CodexProfile.Reasoning, out var process) || !process.IsAlive) return;
+        PendingSignIn? pending;
+        lock (_signInGate) { pending = _signIn; _signIn = null; }
+        if (pending is null) return;
+        pending.Completion.TrySetResult(new SignInOutcome(false, "Sign-in cancelled."));
+        if (pending.Id is string id && _processes.TryGetValue(CodexProfile.Reasoning, out var process))
+            await CancelLoginAsync(process, id).ConfigureAwait(false);
+    }
+
+    private static async Task CancelLoginAsync(CodexProcess process, string loginId)
+    {
+        if (!process.IsAlive) return;
         using var grace = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        try { await process.Rpc.CallAsync("account/login/cancel", new { loginId = id }, grace.Token).ConfigureAwait(false); }
+        try { await process.Rpc.CallAsync("account/login/cancel", new { loginId }, grace.Token).ConfigureAwait(false); }
         catch (Exception) { /* already finished or gone */ }
     }
 
@@ -384,7 +419,7 @@ public sealed class CodexService : IStudioAgent
         switch (method)
         {
             case "account/login/completed":
-                _ = FinishSignInAsync(parameters.True("success"), parameters.Str("error"));
+                _ = FinishSignInAsync(parameters.Str("loginId"), parameters.True("success"), parameters.Str("error"));
                 return;
             case "account/updated":
                 _ = RefreshQuietlyAsync();
@@ -492,17 +527,29 @@ public sealed class CodexService : IStudioAgent
         return Task.FromException<object?>(new NotSupportedException($"Family Studio does not allow {method}."));
     }
 
-    private async Task FinishSignInAsync(bool success, string? error)
+    private async Task FinishSignInAsync(string? loginId, bool success, string? error)
     {
-        var completion = _signIn;
-        _signInId = null;
         if (success)
         {
-            StopProcess(CodexProfile.Image);
+            // Any finished sign-in signs the user in, even one that was replaced by a newer attempt.
+            StopProcess(CodexProfile.Image); // it holds the old credentials in memory
             await RefreshQuietlyAsync().ConfigureAwait(false);
+            try { await RefreshModelsAsync(_lifetime.Token).ConfigureAwait(false); }
+            catch (Exception) { /* the catalog from before the sign-in stays */ }
         }
-        Journal?.Write("sign_in_finished", new { success });
-        completion?.TrySetResult(new SignInOutcome(success, success ? null : error ?? "Sign-in did not complete."));
+        PendingSignIn? pending;
+        lock (_signInGate)
+        {
+            // A failure only ends the attempt it belongs to. A cancelled attempt reports its failure
+            // too, possibly before the newer attempt has its ID, so an unmatched failure is ignored.
+            pending = _signIn;
+            if (pending is not null && (success || loginId is null || pending.Id == loginId)) _signIn = null;
+            else pending = null;
+        }
+        Journal?.Write("sign_in_finished", new { success, current = pending is not null });
+        pending?.Completion.TrySetResult(success && Account is not null
+            ? new SignInOutcome(true, null)
+            : new SignInOutcome(false, success ? "Codex finished the sign-in but reports no ChatGPT account. Try again." : error ?? "Sign-in did not complete."));
     }
 
     private async Task RefreshQuietlyAsync()
@@ -532,7 +579,9 @@ public sealed class CodexService : IStudioAgent
         if (_disposed) return;
         _disposed = true;
         _lifetime.Cancel();
-        _signIn?.TrySetResult(new SignInOutcome(false, "Family Studio closed."));
+        PendingSignIn? pending;
+        lock (_signInGate) { pending = _signIn; _signIn = null; }
+        pending?.Completion.TrySetResult(new SignInOutcome(false, "Family Studio closed."));
         foreach (var profile in _processes.Keys.ToArray()) StopProcess(profile);
     }
 }

@@ -32,10 +32,15 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
     private readonly StudioEnvironment _environment;
     private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
     private readonly CancellationTokenSource _lifetime = new();
-    private SignInAttempt? _signIn;
+    private int _signInAttempt;
+    private int _refreshQueued;
     private StudioBrief? _shownBrief;
     private string? _shownReferencePath;
     private string? _shownCaptureStamp;
+    private string? _shownFamiliesStamp;
+    private ReviewReport? _shownReview;
+    private ActivityEntry? _shownActivity;
+    private IReadOnlyList<CodexModel>? _shownModels;
     private bool _populating;
     private bool _disposed;
 
@@ -62,8 +67,9 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         ChoosePhotoCommand = new Command(ChoosePhoto, () => CanEditBrief);
         RemovePhotoCommand = new Command(() => SetPhoto(null), () => CanEditBrief && PhotoPath is not null);
         SelectSheetCommand = new Command<string>(s => CurrentSheet = Enum.Parse<Sheet>(s), s => CanOpen(Enum.Parse<Sheet>(s)));
-        SingleModeCommand = new Command(() => SwitchMode(collection: false), () => CanStartNew && IsCollection);
-        CollectionModeCommand = new Command(() => SwitchMode(collection: true), () => CanStartNew && !IsCollection);
+        // The selected segment stays enabled (a disabled one would look greyed out); choosing it again does nothing.
+        SingleModeCommand = new Command(() => { if (IsCollection) SwitchMode(collection: false); }, () => CanStartNew);
+        CollectionModeCommand = new Command(() => { if (!IsCollection) SwitchMode(collection: true); }, () => CanStartNew);
         UsePresetCommand = new Command(() => StartNew(SelectedPreset.Id), () => CanStartNew);
         NewDesignCommand = new Command(() => StartNew(IsCollection ? "blank" : Presets.SingleId), () => CanStartNew);
         OpenAcceptedCommand = new Command(OpenAccepted, () => CanStartNew);
@@ -93,7 +99,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
     // ---- connection ------------------------------------------------------------------------
 
     private Connection _connection = Connection.Starting;
-    public Connection Connection { get => _connection; private set { if (Set(ref _connection, value)) RaiseAll(); } }
+    public Connection Connection { get => _connection; private set { if (Set(ref _connection, value)) RaiseEverything(); } }
     public bool IsSignedIn => Connection == Connection.SignedIn;
     public bool NeedsSignIn => Connection != Connection.SignedIn;
 
@@ -141,14 +147,18 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     private async Task SignInAsync(bool deviceCode)
     {
+        // "Use a code instead" can replace a browser sign-in that is still waiting. Only the newest
+        // attempt may change the window; a replaced one ends quietly.
+        var attempt = ++_signInAttempt;
         try
         {
             Connection = Connection.SigningIn;
             SignInCode = null;
             SignInUrl = null;
             ConnectionMessage = deviceCode ? "Requesting a sign-in code..." : "Opening your browser to sign in with ChatGPT...";
-            _signIn = await _codex.BeginSignInAsync(deviceCode, _lifetime.Token);
-            if (_signIn.BrowserUrl is string url)
+            var signIn = await _codex.BeginSignInAsync(deviceCode, _lifetime.Token);
+            if (attempt != _signInAttempt) return;
+            if (signIn.BrowserUrl is string url)
             {
                 SignInUrl = url;
                 OpenUrl(url);
@@ -156,12 +166,12 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
             }
             else
             {
-                SignInCode = _signIn.UserCode;
-                SignInUrl = _signIn.VerificationUrl;
+                SignInCode = signIn.UserCode;
+                SignInUrl = signIn.VerificationUrl;
                 ConnectionMessage = "Open the link, sign in with ChatGPT and enter this code.";
             }
-            var outcome = await _signIn.Completion;
-            _signIn = null;
+            var outcome = await signIn.Completion;
+            if (attempt != _signInAttempt) return;
             SignInCode = null;
             if (outcome.Success)
             {
@@ -176,6 +186,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) when (!_lifetime.IsCancellationRequested)
         {
+            if (attempt != _signInAttempt) return;
             Connection = Connection.Failed;
             ConnectionMessage = ex.Message;
         }
@@ -183,6 +194,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     private async Task CancelSignInAsync()
     {
+        ++_signInAttempt;
         await _codex.CancelSignInAsync();
         SignInCode = null;
         Connection = Connection.SignedOut;
@@ -246,13 +258,18 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     private void LoadModels()
     {
+        // Keep the user's choice when the catalog is read again.
+        var (model, effort) = (SelectedModel?.Id, SelectedEffort);
+        _shownModels = _codex.Models;
         Models.Clear();
         foreach (var m in _codex.Models)
             Models.Add(new ModelOption(m.Id, m.DisplayName, m.Description, m.Efforts, m.DefaultEffort));
-        SelectedModel = Models.FirstOrDefault(m => m.Id == _environment.PreferredModel)
+        SelectedModel = Models.FirstOrDefault(m => m.Id == model)
+            ?? Models.FirstOrDefault(m => m.Id == _environment.PreferredModel)
             ?? Models.FirstOrDefault(m => _codex.Models.First(c => c.Id == m.Id).IsDefault)
             ?? Models.FirstOrDefault();
-        RaiseAll();
+        if (effort is not null && SelectedModel?.Id == model && Efforts.Contains(effort)) SelectedEffort = effort;
+        RaiseEverything();
     }
 
     private string PreferredEffort(ModelOption model) =>
@@ -302,7 +319,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
     };
 
     private bool _isCollection;
-    public bool IsCollection { get => _isCollection; private set { if (Set(ref _isCollection, value)) RaiseAll(); } }
+    public bool IsCollection { get => _isCollection; private set { if (Set(ref _isCollection, value)) RaiseEverything(); } }
     public bool IsSingle => !IsCollection;
 
     public IReadOnlyList<Preset> CollectionPresets { get; }
@@ -406,9 +423,16 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     public bool CanEditBrief => !IsBusy && !_session.IsAccepted && IsSignedIn;
 
+    /// <summary>The user chose, dropped or removed a photo.</summary>
     public void SetPhoto(string? path)
     {
         if (!CanEditBrief && path is not null) return;
+        ShowPhoto(path);
+    }
+
+    /// <summary>Puts a photo on the plate. Restoring a design uses this too, which is why it has no edit guard.</summary>
+    private void ShowPhoto(string? path)
+    {
         if (path is null)
         {
             PhotoPath = null;
@@ -459,7 +483,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
             _widthText = draft.KnownSizeM is null ? "" : Dimensions.Format(draft.KnownSizeM.X, LengthUnit.Millimetres);
             _depthText = draft.KnownSizeM is null ? "" : Dimensions.Format(draft.KnownSizeM.Y, LengthUnit.Millimetres);
             _heightText = draft.KnownSizeM is null ? "" : Dimensions.Format(draft.KnownSizeM.Z, LengthUnit.Millimetres);
-            if (draft.ReferenceImagePath is string photo && File.Exists(photo)) SetPhoto(photo); else SetPhoto(null);
+            ShowPhoto(draft.ReferenceImagePath is string photo && File.Exists(photo) ? photo : null);
 
             foreach (var item in Items) item.Changed -= DraftChanged;
             foreach (var material in CollectionMaterials) material.Changed -= DraftChanged;
@@ -630,21 +654,45 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         Raise(nameof(PreviewCaption));
     }
 
+    // Lists are rebuilt only when their content changes, so progress updates never reset a checkbox mid-click.
     private void ShowFamilies()
     {
         var families = _session.Snapshot?.Families ?? Array.Empty<FamilyReceipt>();
-        var selected = Families.Where(f => !f.Selected).Select(f => f.AssetId).ToHashSet();
-        Families.Clear();
-        foreach (var family in families)
+        var stamp = string.Join("|", families.Select(f => $"{f.AssetId}:{f.Revision}:{f.FamilyName}"));
+        if (stamp != _shownFamiliesStamp)
         {
-            var row = new FamilyRow(family.AssetId, family.FamilyName, family.SizeM.ToMillimetres(),
-                $"{family.SolidParts} solids  ·  revision {family.Revision}") { Selected = !selected.Contains(family.AssetId) };
-            row.PropertyChanged += (_, _) => RefreshActions();
-            Families.Add(row);
+            _shownFamiliesStamp = stamp;
+            var deselected = Families.Where(f => !f.Selected).Select(f => f.AssetId).ToHashSet();
+            Families.Clear();
+            foreach (var family in families)
+            {
+                var row = new FamilyRow(family.AssetId, family.FamilyName, family.SizeM.ToMillimetres(),
+                    $"{family.SolidParts} solids  ·  revision {family.Revision}") { Selected = !deselected.Contains(family.AssetId) };
+                row.PropertyChanged += (_, _) => RefreshActions();
+                Families.Add(row);
+            }
         }
-        Findings.Clear();
-        foreach (var f in _session.LastReview?.Findings ?? Array.Empty<ReviewFinding>())
-            Findings.Add(new FindingRow($"{f.Severity.ToUpperInvariant()}  ·  {f.Category.ToUpperInvariant()}  ·  {f.PlacementKey ?? f.AssetId}", f.Evidence, f.Correction, f.Severity == "major"));
+
+        var review = _session.LastReview;
+        if (!ReferenceEquals(review, _shownReview))
+        {
+            _shownReview = review;
+            Findings.Clear();
+            foreach (var f in review?.Findings ?? Array.Empty<ReviewFinding>())
+                Findings.Add(new FindingRow($"{f.Severity.ToUpperInvariant()}  ·  {f.Category.ToUpperInvariant()}  ·  {f.PlacementKey ?? f.AssetId}", f.Evidence, f.Correction, f.Severity == "major"));
+        }
+    }
+
+    private void ShowActivity()
+    {
+        var entries = _session.Activity;
+        var latest = entries.Count == 0 ? null : entries[entries.Count - 1];
+        if (ReferenceEquals(latest, _shownActivity)) return;
+        _shownActivity = latest;
+        Activity.Clear();
+        foreach (var entry in entries.Reverse().Take(40))
+            Activity.Add(new ActivityRow(entry.Time.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture), entry.Text,
+                entry.Duration is TimeSpan d ? (d.TotalSeconds < 90 ? $"{d.TotalSeconds:0} s" : $"{d.TotalMinutes:0.0} min") : "", entry.IsError));
     }
 
     private async Task RefreshProjectsAsync()
@@ -719,7 +767,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         {
             if (!IsSignedIn) return "Sign in with ChatGPT";
             if (IsBusy) return "Working";
-            if (_session.HasFamilies) return IsCollection ? "Load into project" : "Load into project";
+            if (_session.HasFamilies) return "Load into project";
             if (_session.IsAccepted) return IsCollection ? "Build families" : "Build family";
             if (_session.State == StudioState.Review && _session.Reference is not null) return "Accept design";
             return IsCollection ? "Make reference sheet" : HasPhoto ? "Read the photo" : "Make reference";
@@ -830,17 +878,35 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     // ---- refresh -----------------------------------------------------------------------------
 
+    /// <summary>
+    /// Session and account events can fire on any thread, and inside Revit's own events. The window
+    /// always refreshes later, in its own dispatcher operation (with the UI thread's synchronization
+    /// context), and a burst of events costs one refresh.
+    /// </summary>
     private void OnBackgroundChange()
     {
-        if (_disposed) return;
-        if (_ui.CheckAccess()) Refresh();
-        else _ui.BeginInvoke(DispatcherPriority.DataBind, new Action(Refresh));
+        if (_disposed || Interlocked.Exchange(ref _refreshQueued, 1) == 1) return;
+        _ui.BeginInvoke(DispatcherPriority.DataBind, new Action(() =>
+        {
+            Volatile.Write(ref _refreshQueued, 0);
+            Refresh();
+        }));
     }
 
     private void Refresh()
     {
         if (_disposed) return;
         if (Connection == Connection.SignedIn && _codex.Account is null) Connection = Connection.SignedOut;
+        else if (Connection is Connection.SignedOut or Connection.SigningIn && _codex.Account is not null)
+        {
+            // Signed in some other way, such as a browser sign-in that finished after "Use a code instead".
+            ++_signInAttempt;
+            SignInCode = null;
+            SignInUrl = null;
+            ConnectionMessage = "";
+            Connection = Connection.SignedIn;
+        }
+        if (!ReferenceEquals(_codex.Models, _shownModels)) LoadModels(); // the catalog is read again after every sign-in
         ShowBrief(_session.Brief);
         var reference = _session.Reference;
         if (reference?.Path != _shownReferencePath)
@@ -852,13 +918,10 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         }
         ShowCapture();
         ShowFamilies();
-        Activity.Clear();
-        foreach (var entry in _session.Activity.Reverse().Take(40))
-            Activity.Add(new ActivityRow(entry.Time.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture), entry.Text,
-                entry.Duration is TimeSpan d ? (d.TotalSeconds < 90 ? $"{d.TotalSeconds:0} s" : $"{d.TotalMinutes:0.0} min") : "", entry.IsError));
+        ShowActivity();
         if (CurrentSheet == Sheet.Build && !CanOpen(Sheet.Build)) CurrentSheet = _session.Reference is null ? Sheet.Brief : Sheet.Reference;
         if (CurrentSheet == Sheet.Reference && !CanOpen(Sheet.Reference)) CurrentSheet = Sheet.Brief;
-        RaiseAll();
+        RaiseEverything();
     }
 
     private void RefreshActions()
@@ -868,18 +931,33 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         CommandManager.InvalidateRequerySuggested();
     }
 
+    /// <summary>
+    /// Refreshes every binding and every command's enabled state. WPF only re-asks commands after
+    /// input, so work that finishes on its own must ask for it, or buttons stay disabled.
+    /// </summary>
+    private void RaiseEverything()
+    {
+        RaiseAll();
+        CommandManager.InvalidateRequerySuggested();
+    }
+
     // ---- helpers -----------------------------------------------------------------------------
 
-    /// <summary>Loads an image fully into memory, so the file is never locked while shown.</summary>
+    /// <summary>
+    /// Loads an image fully into memory, so the file is never locked while shown. Large photos are
+    /// decoded at display size: a 40-megapixel photo would otherwise cost about 160 MB each time.
+    /// </summary>
     private static ImageSource? LoadImage(string path)
     {
+        const int maxWidth = 1600;
         try
         {
+            var bytes = File.ReadAllBytes(path);
             var image = new BitmapImage();
-            using var stream = File.OpenRead(path);
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
-            image.StreamSource = stream;
+            if (ReferenceImages.Measure(bytes) is { Width: > maxWidth }) image.DecodePixelWidth = maxWidth;
+            image.StreamSource = new MemoryStream(bytes);
             image.EndInit();
             image.Freeze();
             return image;

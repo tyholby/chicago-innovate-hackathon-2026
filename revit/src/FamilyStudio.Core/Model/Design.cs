@@ -84,6 +84,25 @@ public sealed record StudioDraft(
             throw new ArgumentException("Reference photos and known dimensions apply to a single item.");
     }
 
+    /// <summary>
+    /// True when both drafts ask for the same design. Known sizes match within 0.1 mm: the window shows
+    /// sizes to 0.1 mm, so a reopened design would otherwise never match the inputs it was made from.
+    /// </summary>
+    public bool SameInputs(StudioDraft other) =>
+        Style == other.Style &&
+        Assets.SequenceEqual(other.Assets) &&
+        Materials.SequenceEqual(other.Materials) &&
+        AssetNames.SequenceEqual(other.AssetNames) &&
+        ReferenceImagePath == other.ReferenceImagePath &&
+        (KnownSizeM, other.KnownSizeM) switch
+        {
+            (null, null) => true,
+            ({ } a, { } b) => Math.Abs(a.X - b.X) <= SizeMatchM && Math.Abs(a.Y - b.Y) <= SizeMatchM && Math.Abs(a.Z - b.Z) <= SizeMatchM,
+            _ => false
+        };
+
+    private const double SizeMatchM = 0.0001;
+
     /// <summary>Applies the user's names to the brief, so the model never renames an item the user named.</summary>
     public StudioBrief ApplyNames(StudioBrief brief) => brief with
     {
