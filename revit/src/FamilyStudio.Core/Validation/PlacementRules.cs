@@ -22,15 +22,18 @@ public static class PlacementRules
     public static Vec3 ToWorld(Vec3 local, Placement placement) => Rotate(local, placement.RotationDegrees) + placement.PositionM;
 
     public static Box3 WorldBounds(FamilyRecipe recipe, Placement placement) =>
-        Box3.Of(recipe.Parts.SelectMany(RecipeRules.Corners).Select(p => ToWorld(p, placement)));
+        recipe.Solids.Select(part => Shapes.Bounds(part, placement.RotationDegrees, placement.PositionM)).Aggregate((a, b) => a.Union(b));
 
-    /// <summary>Untilted parts, largest top area first. These are the only valid support surfaces.</summary>
-    public static IEnumerable<RecipePart> Surfaces(FamilyRecipe recipe) => recipe.Parts
-        .Where(p => Math.Abs(p.TiltDegrees) < Epsilon)
-        .OrderByDescending(p => (p.MaxM.X - p.MinM.X) * (p.MaxM.Y - p.MinM.Y))
-        .ThenByDescending(p => p.MaxM.Z);
+    /// <summary>
+    /// The flat tops of level boxes and upright cylinders, largest first. These are the only valid
+    /// support surfaces; each is a horizontal rectangle at the height of its MaxM.Z.
+    /// </summary>
+    public static IEnumerable<SupportSurface> Surfaces(FamilyRecipe recipe) => recipe.Solids
+        .SelectMany(Shapes.Surfaces)
+        .OrderByDescending(s => (s.MaxM.X - s.MinM.X) * (s.MaxM.Y - s.MinM.Y))
+        .ThenByDescending(s => s.MaxM.Z);
 
-    public static RecipePart Surface(FamilyRecipe recipe, string name) =>
+    public static SupportSurface Surface(FamilyRecipe recipe, string name) =>
         Surfaces(recipe).SingleOrDefault(p => p.Name == name)
         ?? throw StudioValidationException.Single("unknown_surface", "supportPartName",
             $"\"{name}\" is not a horizontal part of {recipe.AssetId}. Choose one from the supplied surface list.",
@@ -73,7 +76,7 @@ public static class PlacementRules
             }
 
             var parent = placements[p.SupportKey];
-            RecipePart surface;
+            SupportSurface surface;
             try { surface = Surface(recipes[parent.AssetId], p.SupportPartName); }
             catch (StudioValidationException e)
             {
@@ -130,14 +133,15 @@ public static class PlacementRules
         return true;
     }
 
-    private static void CheckFootprint(List<ValidationIssue> issues, Placement p, FamilyRecipe recipe, Placement parent, RecipePart surface)
+    private static void CheckFootprint(List<ValidationIssue> issues, Placement p, FamilyRecipe recipe, Placement parent, SupportSurface surface)
     {
         // The base (floor-support parts, or everything when none are marked) must sit on the
         // surface. Upper geometry may overhang, like a lampshade wider than the table.
-        var baseParts = recipe.Parts.Where(part => part.IsFloorSupport).ToArray();
+        var solids = recipe.Solids.ToArray();
+        var baseParts = solids.Where(part => part.IsFloorSupport).ToArray();
         var bottom = RecipeRules.Bounds(recipe.Parts).Min.Z;
-        var contacts = (baseParts.Length > 0 ? baseParts : recipe.Parts).SelectMany(RecipeRules.Corners)
-            .Where(c => Math.Abs(c.Z - bottom) <= RecipeRules.FloorToleranceM + Epsilon).ToArray();
+        var contacts = (baseParts.Length > 0 ? baseParts : solids).SelectMany(part => Shapes.ContactPoints(part))
+            .Where(c => Math.Abs(c.Z - bottom) <= RecipeRules.FloorToleranceM + Epsilon).Distinct().ToArray();
         if (contacts.Length < 3)
         {
             issues.Add(Issue(p, "support_footprint", "contacts", "The item has no stable flat base to stand on the surface.", 3, contacts.Length, null));

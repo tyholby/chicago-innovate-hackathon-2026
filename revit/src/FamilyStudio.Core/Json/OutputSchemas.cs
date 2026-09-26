@@ -72,14 +72,24 @@ public static class OutputSchemas
     {
         var components = asset?.Components.Select(c => c.Id).ToArray()
             ?? brief.Assets.SelectMany(a => a.Components.Select(c => c.Id)).Distinct(StringComparer.Ordinal).ToArray();
+        // Shape first, so the model decides what a part is before it writes that shape's fields.
         return Object(
             ("name", String()),
-            ("minM", Vec3()),
-            ("maxM", Vec3()),
-            ("tiltDegrees", Number()),
+            ("shape", Enum(PartShapes.All)),
             ("materialId", Enum(brief.Materials.Select(m => m.Id))),
             ("componentId", components.Length == 0 ? Null() : Nullable(Enum(components))),
-            ("isFloorSupport", Boolean()));
+            ("isFloorSupport", Boolean()),
+            ("mirror", Boolean()),
+            ("minM", Nullable(Vec3())),
+            ("maxM", Nullable(Vec3())),
+            ("tiltDegrees", Number()),
+            ("radiusM", Number()),
+            ("endRadiusM", Nullable(Number())),
+            ("pointsM", Nullable(Array(Vec3()))),
+            ("plane", Nullable(Enum(ProfilePlanes.All))),
+            ("outlineM", Nullable(Array(Array(Number())))),
+            ("fromM", Nullable(Number())),
+            ("toM", Nullable(Number())));
     }
 
     private static JsonObject LayoutNode(StudioBrief brief) => Object(("placements", Array(IntentNode(brief))));

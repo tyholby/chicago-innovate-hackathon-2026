@@ -45,7 +45,7 @@ internal sealed class InMemoryHost(SessionJournal journal) : IStudioHost
             var revision = _families.TryGetValue(recipe.AssetId, out var old) ? old.Revision + 1 : 1;
             _recipes[recipe.AssetId] = recipe;
             _families[recipe.AssetId] = new FamilyReceipt(recipe.AssetId, $"FS_{recipe.AssetId}", "Default", "(in memory)",
-                recipe.AssetId, recipe.AssetId, recipe.Parts.Length, size, revision);
+                recipe.AssetId, recipe.AssetId, recipe.Solids.Count(), size, revision);
         }
         foreach (var placement in proposal.Placements)
             _instances[placement.Key] = (placement, _recipes[placement.AssetId]);

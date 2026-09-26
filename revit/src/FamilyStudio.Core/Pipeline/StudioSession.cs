@@ -40,8 +40,8 @@ public sealed class StudioSession : IDisposable
 {
     private static readonly TimeSpan BriefTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan ReferenceTimeout = TimeSpan.FromMinutes(8);
-    private static readonly TimeSpan PlanningTimeout = TimeSpan.FromMinutes(12);
-    private static readonly TimeSpan ReviewTimeout = TimeSpan.FromMinutes(6);
+    private static readonly TimeSpan PlanningTimeout = TimeSpan.FromMinutes(20); // detailed shapes at xhigh effort take longer
+    private static readonly TimeSpan ReviewTimeout = TimeSpan.FromMinutes(10);
 
     private readonly IStudioAgent _agent;
     private readonly IStudioHost _host;

@@ -102,16 +102,37 @@ refused.
    `%ProgramData%` / `%ProgramFiles%\Autodesk\RVT <version>\Family Templates\English` (or `English_I`).
 3. In one transaction: category Furniture; add one type named from the accepted size
    (`"500 x 500 x 550 mm"`, so rebuilt revisions keep the type), then delete the template's other types
-   (in that order: Revit refuses to delete a family's last type); set Description and Type Comments; for each part, extrude its rectangle, rotate it about X through its centre when tilted
-   (`SolidUtils.CreateTransformed`), and add it as a `FreeFormElement`; one material per brief material
-   (RGB colour, unique name).
-4. Measure the solids back (bounding boxes of every element) and reject the family if any axis differs
-   from the validated envelope by more than 2 mm, or from verified dimensions by more than 2 mm.
+   (in that order: Revit refuses to delete a family's last type); set Description and Type Comments; build
+   every part, mirror copies included, with `ShapeSolids` and add each solid as a `FreeFormElement`; one
+   material per brief material (RGB colour, unique name).
+4. Measure the solids back from their geometry (the finest face meshes, edge points and the exact
+   extremes of circular edges; element bounding boxes can be loose around curves) and reject the family if
+   any axis differs from the validated envelope by more than 2 mm, or from verified dimensions by more
+   than 2 mm.
 5. Save to `families/preview-N/<assetId>/revision-NN/<Family name>.rfa` and close the family document.
    Revisions are numbered per preview room, hence the room folder.
 
 Family names come from the item names (`SafeName`: file-safe, at most 60 characters). Two items with the
 same name get their item ID appended.
+
+## Shapes in Revit
+
+`ShapeSolids` builds each shape only from `CreateExtrusionGeometry` and `CreateRevolvedGeometry`, the
+most robust geometry calls, and each construction is exactly what the core validates:
+
+| Shape | Construction |
+| --- | --- |
+| Box | A rectangle extruded along Z, then rotated about X through its centre when tilted |
+| Rounded box | Three rounded-rectangle slabs (one along each axis) and a sphere at each core corner: the core box grown by the radius. United into one solid with `BooleanOperationsUtils` when Revit can, otherwise kept as overlapping forms |
+| Cylinder | A trapezoid beside the axis (with one edge on it) revolved once; a taper when the radii differ |
+| Sphere | A half circle closed along its diameter, revolved once |
+| Tube | A cylinder per segment and a sphere at every point, united when Revit can |
+| Profile | The outline from `Shapes.Outline` (lines and fillet arcs) extruded along the plane's normal |
+
+Revit refuses curves shorter than about 0.8 mm, so a sliver of edge left between two fillets (or a tiny
+fillet) is dropped and its neighbours meet at its midpoint. If Revit refuses a rounded box or a rounded
+profile, it is built with sharp edges instead; every fallback is written to the session log as
+`shape_fallbacks`, and the measure-back still checks the result.
 
 ## Applying a build
 

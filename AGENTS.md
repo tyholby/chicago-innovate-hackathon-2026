@@ -89,6 +89,10 @@ up or reloading the Revit add-in on someone's machine as an agent: follow
   `System.Windows.Shapes.Path`). Add `using System.IO;` where needed.
 - **Theme colours are `DynamicResource` tokens** from `UI/Theme/Paper.xaml` and `Night.xaml`. Never
   hard-code a colour in a view; follow [docs/design-system.md](docs/design-system.md).
+- **Geometry lives in `Core/Model/Shapes.cs`.** Bounds, contact points, support surfaces and the
+  drawing mesh all come from it, so validation checks what gets built. A new or changed shape touches
+  `Shapes`, `RecipeRules.ValidateShapes`, `OutputSchemas`, the recipe prompt, `ShapeSolids` (Revit) and
+  `ShapesTests`, which compares every bound with independent dense sampling.
 - **Prompts and schemas move together.** When a record that the model returns changes, change its schema
   in `Json/OutputSchemas.cs` (the schema tests compare them) and bump `StudioPrompts.Version`.
 - **Codex feature flags must exist in the installed Codex.** An unknown `--disable` flag makes

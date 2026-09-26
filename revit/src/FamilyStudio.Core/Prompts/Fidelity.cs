@@ -6,8 +6,8 @@ namespace FamilyStudio.Core.Prompts;
 /// </summary>
 public sealed record Fidelity(int Level, string Name, string Summary)
 {
-    public static readonly Fidelity Concept = new(4, "Concept", "Silhouette, supports and material zones. 5 to 16 parts.");
-    public static readonly Fidelity Refined = new(6, "Refined", "Principal components, gaps and insets. 12 to 32 parts.");
+    public static readonly Fidelity Concept = new(4, "Concept", "Silhouette, supports and material zones in their true shapes. 8 to 30 parts.");
+    public static readonly Fidelity Refined = new(6, "Refined", "Principal components, tapers, curves, gaps and insets. 20 to 70 parts.");
     public static readonly Fidelity[] All = { Concept, Refined };
 
     public override string ToString() => Name;
@@ -18,16 +18,19 @@ public sealed record Fidelity(int Level, string Name, string Summary)
             ? """
               Resolve the principal components, their proportions and orientation, visible gaps and insets,
               layered construction and distinct material zones. Match the reference's recognizable features
-              using boxes and X-axis tilts. Keep cushions at their observed thickness, separation and pose;
-              never exaggerate them. Aim for 12 to 32 purposeful parts (fewer for simple items, never more
-              than 60). More parts do not by themselves improve fidelity; avoid hidden or redundant pieces.
-              A missing, flattened, misproportioned or misoriented principal component is a major silhouette
-              problem even when the overall size is within tolerance.
+              with the shape that fits each one: tapered or splayed cylinders, rounded boxes for upholstery
+              with a realistic crown, profiles for sculpted outlines, tubes for bent frames. Keep cushions at
+              their observed thickness, separation and pose; never exaggerate them. Aim for 20 to 70 purposeful
+              parts (fewer for simple items, never more than 120 counting mirror copies). More parts do not by
+              themselves improve fidelity; avoid hidden or redundant pieces. A missing, flattened,
+              misproportioned or misoriented principal component is a major silhouette problem even when the
+              overall size is within tolerance.
               """
             : """
               Represent the dominant silhouette, the principal supports, the working surfaces and the material
-              zones. Aim for 5 to 16 purposeful parts (fewer for simple items, never more than 60). Simplified
-              secondary shapes are fine as long as the item stays recognizable.
+              zones in their true shapes: round members round, soft parts rounded, curves curved. Aim for 8 to
+              30 purposeful parts (fewer for simple items, never more than 120 counting mirror copies).
+              Simplified secondary details are fine as long as the item stays recognizable.
               """;
         return $"""
 
@@ -38,7 +41,8 @@ public sealed record Fidelity(int Level, string Name, string Summary)
             Compare component proportions with the reference qualitatively; never measure them from pixels.
             Cushions may lie flat, recline or stand upright: follow the reference, whatever the target.
             Check front and back orientation, open space and material separation, not only overall size.
-            Stitching, bevels, wood grain and photorealism are outside every target.
+            Blocky boxes standing in for round, tapered, curved or soft components are silhouette problems
+            at every target. Stitching, wood grain and photorealism are outside every target.
 
             """;
     }

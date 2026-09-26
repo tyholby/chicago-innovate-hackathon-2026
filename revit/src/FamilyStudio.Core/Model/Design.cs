@@ -10,7 +10,7 @@ public static class StudioLimits
     public const int MaxMaterialNotes = 4;
     public const int MaxMaterials = 16;
     public const int MaxQuantity = 16;
-    public const int MaxParts = 60;
+    public const int MaxParts = 120;
 
     /// <summary>The preview room is 8 m wide (X) and 6 m deep (Y), centred on the origin.</summary>
     public const double RoomHalfWidthM = 4;

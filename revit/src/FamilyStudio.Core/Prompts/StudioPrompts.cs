@@ -10,7 +10,7 @@ namespace FamilyStudio.Core.Prompts;
 /// </summary>
 public static class StudioPrompts
 {
-    public const string Version = "family-studio-prompts-1";
+    public const string Version = "family-studio-prompts-2";
 
     /// <summary>Thread-level instructions shared by every stage.</summary>
     public static string Developer(bool imageStage) =>
@@ -38,8 +38,9 @@ public static class StudioPrompts
         ITEMS
         Keep exactly the input item count and order, with IDs a1, a2 and so on. Use each non-empty
         assetNames entry as that item's name; otherwise give a short descriptive name. Quantity is 1
-        unless the input asks for more. Describe each item's geometry concisely: its principal parts,
-        how they are arranged, and which side is the front.
+        unless the input asks for more. Describe each item's geometry concisely: its principal parts and
+        their shapes (for example tapered round legs, soft rounded cushions, a curved back), how they are
+        arranged, and which side is the front.
 
         MATERIALS
         Material notes, when given, become m1, m2 and so on, in order. Otherwise infer a small palette
@@ -61,7 +62,7 @@ public static class StudioPrompts
         SUPPORT
         floorStanding is true when an item rests on the floor, and false when it stands on another
         item, hangs on a wall or is otherwise elevated. Describe the intended support or mounting height.
-        Native blockouts have no MEP connectors.
+        The native families have no MEP connectors.
 
         dimensionsConfirmed is always false; the plugin sets it from the user's own input.
         {(draft.IsSingleItem ? SingleBriefRules : CollectionBriefRules)}
@@ -98,8 +99,9 @@ public static class StudioPrompts
           Show a single large, readable three-quarter view on a quiet neutral background with soft studio
           light and a grounded contact shadow. Make the front and back unmistakable. Add the item's short
           name, a compact palette of only the supplied materials, and the accepted overall dimensions as
-          W x D x H in millimetres. Keep the form simple enough for box-based native Revit geometry while
-          the finishes look real. No room, props, people, extra products, logos or watermarks.
+          W x D x H in millimetres. Keep the form clear and buildable from native solids (rounded blocks,
+          round and tapered members, bent tubes and shaped profiles) while the finishes look real. No room,
+          props, people, extra products, logos or watermarks.
 
           Accepted brief:
           {StudioJson.Write(brief)}
@@ -122,7 +124,7 @@ public static class StudioPrompts
           Label each card with a short name, the quantity and the overall W x D x H in millimetres from the
           brief. Label any component dimension as a component, never as the overall size. Quantity two
           means two instances in the room; draw one exemplar. Apply the brief's materials consistently.
-          Keep silhouettes simple enough for native Revit blockouts while the finishes look real.
+          Keep silhouettes clear and buildable from native solids while the finishes look real.
           No room, floor plan, collage, logos or watermarks. All seven items and four swatches on this one page.
 
           Accepted brief:
@@ -139,20 +141,50 @@ public static class StudioPrompts
 
         GEOMETRY
         Metres: X width, Y depth, Z height. The origin is the centre of the base and the front faces -Y.
-        Each part is a box from minM to maxM, optionally tilted by tiltDegrees about its own X axis through
-        its centre. Positive tilt swings the top of the part toward the front (-Y); a backrest that leans
-        back, with its top toward +Y, uses a negative tilt. Use at most 60 parts and follow the fidelity
-        target below.
+        Every part has every field. Fill the fields its shape uses; set the others to null, with radiusM 0,
+        tiltDegrees 0 and mirror false where they do not apply. Use at most 120 solids, counting mirror
+        copies, and follow the fidelity target below.
+
+        SHAPES
+        box: a block from minM to maxM. radiusM rounds all twelve edges (0 for crisp edges, at most half the
+          smallest side). tiltDegrees tilts it about its own X axis through its centre: positive swings the
+          top toward the front (-Y), so a backrest or cushion that leans back uses a negative tilt.
+        cylinder: a round member whose axis runs from pointsM[0] to pointsM[1], with radiusM at the first
+          point and endRadiusM at the second (equal for a straight member, smaller for a taper). The axis may
+          point any way: splayed and tapered legs, posts, stretchers, rails, a round top (a short upright
+          cylinder), a drum base, a lamp shade (a wide taper).
+        sphere: a ball of radiusM centred on pointsM[0]: knobs, ball feet, finials, globe shades.
+        tube: a round bar of radiusM through 2 to 12 pointsM, with rounded joints and ends: bent metal or
+          bentwood frames, arms, handles, rails and piping.
+        profile: a flat outline pushed straight through a thickness. plane side draws it in (Y, Z) and
+          extrudes it along X from fromM to toM; front draws it in (X, Z) and extrudes along Y; plan draws it
+          in (X, Y) and extrudes along Z. outlineM lists 3 to 32 [u, v] points in order around the shape,
+          never crossing itself, and radiusM rounds every corner. Use it for shaped silhouettes: sculpted
+          chair sides and arms, sled bases, curved backrests and seat shells (outline both faces of the curve
+          as one closed band), shaped aprons, headboards and table tops.
+        mirror: true also builds the part's mirror image across X = 0, named "<name> mirrored". Model one
+          side of a symmetric item, mirror it, and never list the copy yourself.
+
+        CRAFT
+        The result must not look like a blocky blockout. Give every component the shape it really has:
+        turned and tapered members are cylinders; anything upholstered or soft is a box with rounded edges
+        (15 to 60 mm for cushions, mattresses and padded arms); crisp slabs get a small radius (3 to 10 mm);
+        bends are tubes and curves are profiles. Keep real proportions: legs taper and splay where the
+        reference shows it, cushions have their true thickness and crown, frames stay slender. Join parts
+        the way they are made, overlapping slightly at joints and never leaving gaps. Keep the open space
+        the reference shows under seats, between legs and inside frames.
         Use only the brief's material IDs. Tag the parts of an explicitly sized component with its
-        componentId, otherwise use null. Mark every part that stands on the floor with isFloorSupport;
-        floor-standing items and their supports must touch Z = 0 within 1 mm.
+        componentId, otherwise use null. Mark every part that stands on the floor with isFloorSupport; its
+        lowest point must touch Z = 0 within 1 mm, and floor-standing items must reach the floor. Round
+        floor supports (cylinders, spheres and tubes) are moved up or down by at most their radius so their
+        lowest point stands exactly on Z = 0, so a splayed leg's axis can simply start at Z = 0.
 
         SIZE
         Overall size tolerance is max(10 mm, 5 percent) per axis unless the dimension policy below says
-        otherwise. The plugin measures the envelope from every transformed corner, so do not calculate
-        or return envelope fields. Principal structural parts must establish the full width, depth and
-        height; never pad the bounds with tiny detached parts. For tilted parts, account for their rotated
-        corners. Depth is maxY minus minY, not either coordinate alone.
+        otherwise. The plugin measures the envelope from the exact shape of every part (tilts, circles,
+        arcs, rounded edges and mirror copies), so do not calculate or return envelope fields. Principal
+        structural parts must establish the full width, depth and height; never pad the bounds with tiny
+        detached parts. Depth is the full Y extent, not either coordinate alone.
 
         Return assetId and parts only. The plugin validates the draft before any Revit work and will
         return specific errors if a correction is needed.
@@ -235,7 +267,7 @@ public static class StudioPrompts
 
     public static string Review(StudioBrief brief, NativeSnapshot snapshot, Fidelity fidelity, object evidence) =>
         $"""
-        You are a fresh, independent reviewer of native Revit blockouts.
+        You are a fresh, independent reviewer of native Revit furniture families.
         Image 1 is the accepted reference. Images 2 to 4 are the ACTUAL current Revit views, in the order
         of the evidence manifest, captured by the plugin together with the measured model state below.
         Inspect every view before writing findings. Do not ask for captures or tools.
@@ -245,11 +277,13 @@ public static class StudioPrompts
         only the outer box: proportions and orientation, cushion volume where relevant, gaps and insets,
         and distinct material zones. Cite the view that shows each problem and the part to change. A correct
         overall size does not prove visual fidelity. Where the reference shows legs, rails or open space
-        beneath a seat or top, a solid mass filling that space is a major silhouette finding.
+        beneath a seat or top, a solid mass filling that space is a major silhouette finding. Blocky boxes
+        standing in for round, tapered, curved or soft components are silhouette findings too; name the
+        shape to use instead (cylinder, rounded box, tube or profile) in the correction.
 
         Review only the requested items; an item's role never follows from its slot number. Use the measured
         values for any dimension claim, since images alone do not establish measurements. Ignore stitching,
-        bevels, wood grain and realistic foliage, which belong to rendering.
+        wood grain and realistic foliage, which belong to rendering.
         Categories: count, silhouette, facing, scale, support, placement (dimension problems are scale).
         Severity: major or minor. Any major finding means passed is false. Explain any minor differences.
         Overall size tolerance is max(10 mm, 5 percent) per axis, envelope tolerance 2 mm and floor contact
@@ -275,6 +309,8 @@ public static class StudioPrompts
         Return a targeted SceneRepair for the findings below, using the exact baseSha256 supplied.
         Keep accepted dimensions and IDs. Change only the recipes or placement intents the findings need.
         For a recipe, upsert only changed or new named parts and remove only parts you name explicitly.
+        Parts use the recipe's shapes (box, cylinder, sphere, tube, profile); to give a part a better shape,
+        upsert it under the same name. Mirror copies follow their original, so edit the original only.
         Empty arrays mean no change of that kind. The plugin merges the repair, recomputes envelopes and
         dependent placements, and validates the whole scene before touching Revit. Do not repeat
         unchanged recipes, parts or placements. Keep the fidelity target while fixing what was observed.

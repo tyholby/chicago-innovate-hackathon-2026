@@ -47,6 +47,12 @@ following [local-install.md](local-install.md):
 
 ### Not verified yet
 
+- **The curved shapes in Revit.** `ShapeSolids` (rounded boxes, cylinders, spheres, tubes, profiles and
+  their unions) compiles against Revit 2025 to 2027 but has not run inside Revit. Check the session log
+  for `shape_fallbacks` on the first builds.
+- **The model's use of the new shapes.** The prompts and schemas are new (prompts version 2); no live
+  run has used them yet.
+
 - **The rest of the Revit checklist, and anything in Rhino.** In Revit, not yet run: review and repair,
   revise, **Save .rfa**, **Load into project**, collections, the Night theme and closing the preview room
   while a build is queued. No Windows machine has run the Rhino plug-in. See the checklist at the end of
@@ -97,7 +103,7 @@ preview room document, and everything in the checklist in [revit-integration.md]
 | Family Studio has its own Codex home by default | A personal Codex setup (MCP servers, skills, config) never leaks into the plug-in; reusing it is opt-in with `OPENAI_CODEX_HOME` |
 | Two Codex processes, and only known feature flags | Reasoning stages cannot generate images; unknown flags stop Codex from starting; image generation needs code mode |
 | Scope: one item, or a collection of seven | Matches the two flows in the window; the limits live in `StudioLimits` |
-| Geometry is boxes tilted about X, built as `FreeFormElement`s | Simple enough for the model to get right and for code to validate exactly |
+| Geometry uses five shapes: boxes with rounded edges, cylinders and tapers on any axis, spheres, tubes and extruded profiles, with mirroring (2026-09-26) | Boxes alone made every item look blocky. Each shape still has exact bounds in code and is built only from extrusions and revolutions, so validation and the measure-back stay exact |
 | Every design builds in its own preview room | The user's model changes only when they choose **Load into project**, and their families are never overwritten |
 | One family type, named by the accepted size | Rebuilt revisions reload in place without new types |
 | No NuGet packages in the core or the add-in; C# 12 | Revit's shared load context, and identical builds on SDK 8 and 10 |

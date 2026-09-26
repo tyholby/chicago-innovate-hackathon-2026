@@ -39,6 +39,40 @@ internal static class Samples
             new RecipePart("body", new Vec3(-size.X / 2, -size.Y / 2, 0), new Vec3(size.X / 2, size.Y / 2, size.Z), 0, "m1", null, floor)
         }).Compile(brief);
 
+    /// <summary>
+    /// A lounge chair that uses every shape: splayed tapered legs (mirrored cylinders), a slim frame
+    /// and rounded cushions (boxes), bent arms (mirrored tubes), a curved back shell (a side profile)
+    /// and a button (a sphere).
+    /// </summary>
+    public static RecipePart[] ChairParts() => new[]
+    {
+        new RecipePart("leg front", null, null, 0, "m1", null, true, PartShapes.Cylinder, 0.014, 0.020,
+            new[] { new Vec3(-0.33, -0.36, 0), new Vec3(-0.30, -0.32, 0.30) }, Mirror: true),
+        new RecipePart("leg back", null, null, 0, "m1", null, true, PartShapes.Cylinder, 0.014, 0.020,
+            new[] { new Vec3(-0.33, 0.40, 0), new Vec3(-0.30, 0.34, 0.30) }, Mirror: true),
+        new RecipePart("seat frame", new Vec3(-0.33, -0.34, 0.28), new Vec3(0.33, 0.36, 0.34), 0, "m1", null, false, RadiusM: 0.008),
+        new RecipePart("seat cushion", new Vec3(-0.31, -0.36, 0.34), new Vec3(0.31, 0.30, 0.46), 0, "m2", null, false, RadiusM: 0.04),
+        new RecipePart("back cushion", new Vec3(-0.31, 0.26, 0.44), new Vec3(0.31, 0.38, 0.76), -12, "m2", null, false, RadiusM: 0.04),
+        new RecipePart("arm", null, null, 0, "m1", null, false, PartShapes.Tube, 0.02, null,
+            new[] { new Vec3(-0.36, -0.30, 0.30), new Vec3(-0.36, -0.28, 0.56), new Vec3(-0.36, 0.30, 0.58), new Vec3(-0.36, 0.38, 0.40) }, Mirror: true),
+        new RecipePart("back shell", null, null, 0, "m1", null, false, PartShapes.Profile, 0.02, null, null, ProfilePlanes.Side,
+            new[] { new[] { 0.30, 0.30 }, new[] { 0.42, 0.30 }, new[] { 0.44, 0.78 }, new[] { 0.40, 0.80 }, new[] { 0.36, 0.80 }, new[] { 0.36, 0.34 } },
+            -0.33, 0.33),
+        new RecipePart("button", null, null, 0, "m2", null, false, PartShapes.Sphere, 0.012, null, new[] { new Vec3(0, -0.36, 0.42) })
+    };
+
+    /// <summary>A brief sized to the chair's own measured geometry.</summary>
+    public static StudioBrief ChairBrief()
+    {
+        var size = RecipeRulesSize(ChairParts());
+        return new("Chair", "Mid-century lounge chair",
+            new[] { new AssetBrief("a1", "Lounge chair", "Splayed legs, cushions, bent arms, curved back", 1, size, true, Array.Empty<ComponentBrief>(), false) },
+            new[] { Walnut, Wool });
+    }
+
+    private static Vec3 RecipeRulesSize(RecipePart[] parts) =>
+        FamilyStudio.Core.Validation.RecipeRules.Bounds(parts.Select(Shapes.Settle)).Size;
+
     /// <summary>A table: a top part named "top" on a single pedestal.</summary>
     public static FamilyRecipe Table(StudioBrief brief) => new RecipeDraft("a1", new[]
     {

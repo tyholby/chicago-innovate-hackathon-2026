@@ -72,7 +72,7 @@ public class RecipeRulesTests
     [Fact]
     public void A_floor_support_must_touch_zero()
     {
-        var parts = Samples.StoolParts().Select(p => p.Name == "leg-fl" ? p with { MinM = p.MinM with { Z = 0.01 } } : p).ToArray();
+        var parts = Samples.StoolParts().Select(p => p.Name == "leg-fl" ? p with { MinM = p.MinM! with { Z = 0.01 } } : p).ToArray();
         var error = Assert.Throws<StudioValidationException>(() => new RecipeDraft("a1", parts).Compile(Samples.StoolBrief()));
         Assert.Contains(error.Issues, i => i.Code == "floor_support" && i.PartName == "leg-fl");
     }
@@ -95,10 +95,10 @@ public class RecipeRulesTests
     public void Corrections_replace_named_parts_and_keep_the_rest_in_order()
     {
         var before = new RecipeDraft("a1", Samples.StoolParts());
-        var seat = before.Parts[0] with { MaxM = before.Parts[0].MaxM with { Z = 0.76 } };
+        var seat = before.Parts[0] with { MaxM = before.Parts[0].MaxM! with { Z = 0.76 } };
         var extra = before.Parts[1] with { Name = "stretcher" };
         var merged = RecipeDraft.Merge(before, new RecipeDraft("a1", new[] { seat, extra }));
         Assert.Equal(new[] { "seat", "leg-fl", "leg-fr", "leg-bl", "leg-br", "stretcher" }, merged.Parts.Select(p => p.Name));
-        Assert.Equal(0.76, merged.Parts[0].MaxM.Z);
+        Assert.Equal(0.76, merged.Parts[0].MaxM!.Z);
     }
 }

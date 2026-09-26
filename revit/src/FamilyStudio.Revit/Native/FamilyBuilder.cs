@@ -9,13 +9,15 @@ using FamilyStudio.Core.Validation;
 namespace FamilyStudio.Revit.Native;
 
 /// <summary>
-/// Builds one native Furniture family (.rfa) from a validated recipe: a free-form solid per part,
-/// one named material per brief material, one type named by its overall size. The saved family is
-/// measured back and rejected if it drifts from the recipe, or from verified dimensions.
+/// Builds one native Furniture family (.rfa) from a validated recipe: free-form solids for every part
+/// (see <see cref="ShapeSolids"/>), one named material per brief material, one type named by its
+/// overall size. The saved family is measured back and rejected if it drifts from the recipe, or from
+/// verified dimensions.
 /// </summary>
 internal static partial class FamilyBuilder
 {
-    public sealed record Result(string Path, Vec3 SizeM, string TypeName);
+    /// <param name="Notes">Parts built with a fallback (for example sharp instead of rounded edges), for the session log.</param>
+    public sealed record Result(string Path, Vec3 SizeM, string TypeName, IReadOnlyList<string> Notes);
 
     public static Result Create(Application app, string path, string familyName, FamilyRecipe recipe, StudioBrief brief, string? templateOverride)
     {
@@ -27,7 +29,8 @@ internal static partial class FamilyBuilder
             ?? throw new InvalidOperationException("Revit could not create a furniture family.");
         try
         {
-            var solids = new List<FreeFormElement>();
+            var solids = new List<Solid>();
+            var notes = new List<string>();
             using (var transaction = new Transaction(familyDoc, "Family Studio: build family"))
             {
                 transaction.Start();
@@ -35,24 +38,26 @@ internal static partial class FamilyBuilder
                 SetUpSingleType(familyDoc, typeName, asset);
 
                 var materials = new Dictionary<string, ElementId>(StringComparer.Ordinal);
-                foreach (var part in recipe.Parts)
+                foreach (var part in recipe.Solids)
                 {
-                    var solid = Box(part);
-                    var form = FreeFormElement.Create(familyDoc, solid);
                     if (!materials.TryGetValue(part.MaterialId, out var materialId))
                     {
                         materialId = CreateMaterial(familyDoc, brief.Materials.Single(m => m.Id == part.MaterialId));
                         materials[part.MaterialId] = materialId;
                     }
-                    form.get_Parameter(BuiltInParameter.MATERIAL_ID_PARAM)?.Set(materialId);
-                    solids.Add(form);
+                    foreach (var solid in ShapeSolids.Build(part, notes))
+                    {
+                        var form = FreeFormElement.Create(familyDoc, solid);
+                        form.get_Parameter(BuiltInParameter.MATERIAL_ID_PARAM)?.Set(materialId);
+                        solids.Add(solid);
+                    }
                 }
                 familyDoc.Regenerate();
                 if (transaction.Commit() != TransactionStatus.Committed)
                     throw new InvalidOperationException("Revit did not commit the family geometry.");
             }
 
-            var measured = Units.Measure(solids).Size;
+            var measured = Units.MeasureSolids(solids).Size;
             for (var axis = 0; axis < 3; axis++)
             {
                 if (Math.Abs(measured[axis] - expected.Size[axis]) > RecipeRules.ContainmentToleranceM)
@@ -63,7 +68,7 @@ internal static partial class FamilyBuilder
 
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
             familyDoc.SaveAs(path, new SaveAsOptions { OverwriteExistingFile = true });
-            return new Result(path, measured, typeName);
+            return new Result(path, measured, typeName, notes);
         }
         finally
         {
@@ -82,24 +87,6 @@ internal static partial class FamilyBuilder
 
     public static string TypeName(Vec3 size) => string.Format(CultureInfo.InvariantCulture,
         "{0:0} x {1:0} x {2:0} mm", size.X * 1000, size.Y * 1000, size.Z * 1000);
-
-    private static Solid Box(RecipePart part)
-    {
-        var min = Units.Point(part.MinM);
-        var max = Units.Point(part.MaxM);
-        var loop = CurveLoop.Create(new List<Curve>
-        {
-            Line.CreateBound(new XYZ(min.X, min.Y, min.Z), new XYZ(max.X, min.Y, min.Z)),
-            Line.CreateBound(new XYZ(max.X, min.Y, min.Z), new XYZ(max.X, max.Y, min.Z)),
-            Line.CreateBound(new XYZ(max.X, max.Y, min.Z), new XYZ(min.X, max.Y, min.Z)),
-            Line.CreateBound(new XYZ(min.X, max.Y, min.Z), new XYZ(min.X, min.Y, min.Z))
-        });
-        var solid = GeometryCreationUtilities.CreateExtrusionGeometry(new List<CurveLoop> { loop }, XYZ.BasisZ, max.Z - min.Z);
-        if (Math.Abs(part.TiltDegrees) < 1e-9) return solid;
-        // Same convention as the validator: rotate about the part's own X axis through its centre.
-        var centre = (min + max) / 2;
-        return SolidUtils.CreateTransformed(solid, Transform.CreateRotationAtPoint(XYZ.BasisX, part.TiltDegrees * Math.PI / 180, centre));
-    }
 
     private static ElementId CreateMaterial(Document familyDoc, MaterialBrief brief)
     {

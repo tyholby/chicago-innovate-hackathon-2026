@@ -100,16 +100,17 @@ Each AI step is a fresh Codex thread with one message and a strict JSON schema f
 1. **Brief**: the input becomes a structured brief in metres (items, sizes, sized components,
    materials with RGB colours, support).
 2. **Reference**: Codex draws a reference image (skipped when you supply a photo).
-3. **Recipe**, per item: the geometry as named boxes, each optionally tilted about its own X axis.
-   Family Studio measures every tilted corner itself and validates size (max 10 mm or 5 percent per
-   axis, or 2 mm when verified), floor contact, materials and sized components. A rejected recipe
+3. **Recipe**, per item: the geometry as named parts in real shapes: boxes with rounded edges,
+   tapered and splayed cylinders, spheres, bent tubes and extruded profiles with rounded corners, with
+   symmetric parts mirrored. Family Studio measures the exact geometry itself and validates size (max
+   10 mm or 5 percent per axis, or 2 mm when verified), floor contact, materials and sized components. A rejected recipe
    goes back with the exact failed fields, and the model returns a patch pinned to the rejected
    version's hash, up to two times.
 4. **Layout**, for collections: placement *intents* (absolute, relative to another item, on a named
    surface of another item, mirrored, facing something). Family Studio resolves them into positions,
    computes support heights, and checks room bounds, floor contact and footprints.
-5. **Build**: Revit builds each family from its recipe (`FreeFormElement` solids from extrusions,
-   one material per finish, one type named by its size), measures it back, loads it into the preview
+5. **Build**: Revit builds each family from its recipe (`FreeFormElement` solids from extrusions and
+   revolutions, one material per finish, one type named by its size), measures it back, loads it into the preview
    room and places it. Revit work runs through an `ExternalEvent` queue and never holds a
    transaction open while waiting for AI.
 6. **Review and repair** (optional): a fresh reviewer compares the plan and two 3D captures with the

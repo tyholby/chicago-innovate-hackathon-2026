@@ -50,6 +50,13 @@ public class OutputSchemasTests
     }
 
     [Fact]
+    public void Recipe_schema_covers_every_shape()
+    {
+        var brief = Samples.ChairBrief();
+        AssertSameShape(OutputSchemas.Recipe(brief, brief.Assets[0]), StudioJson.Element(new RecipeDraft("a1", Samples.ChairParts())));
+    }
+
+    [Fact]
     public void Review_and_repair_schemas_match_their_records()
     {
         AssertSameShape(OutputSchemas.Review(Brief), StudioJson.Element(new ReviewReport(false, "s",

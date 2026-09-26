@@ -231,6 +231,7 @@ internal sealed class RevitStudioHost : IStudioHost
                 // Each preview room numbers its revisions from 1, so its files get their own folder.
                 var path = _journal.PathFor("families", $"preview-{_roomCount}", asset.Id, $"revision-{revision:D2}", name + ".rfa");
                 var built = FamilyBuilder.Create(app.Application, path, name, recipe, brief, _templateOverride);
+                if (built.Notes.Count > 0) _journal.Write("shape_fallbacks", new { assetId = asset.Id, built.Notes });
 
                 using var load = new Transaction(room, $"Family Studio: load {name}");
                 load.Start();
@@ -243,7 +244,7 @@ internal sealed class RevitStudioHost : IStudioHost
                 room.Regenerate();
                 Commit(load);
                 families[asset.Id] = new FamilyReceipt(asset.Id, name, built.TypeName, path, family.UniqueId, symbol.UniqueId,
-                    recipe.Parts.Length, built.SizeM, revision);
+                    recipe.Solids.Count(), built.SizeM, revision);
             }
 
             using (var place = new Transaction(room, "Family Studio: arrange"))

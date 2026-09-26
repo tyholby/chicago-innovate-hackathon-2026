@@ -40,17 +40,32 @@ Accepting the design freezes brief and image hash (`AcceptedDesign`).
 
 ## Geometry
 
-A family is a list of `RecipePart`s. Each part is an axis-aligned box `MinM`..`MaxM` in metres, optionally
-tilted by `TiltDegrees` about its own X axis through its centre.
+A family is a list of `RecipePart`s in metres. Axes: X width, Y depth, Z height; the family origin is
+the centre of its base at Z = 0 and the front faces negative Y. Each part has a `Shape`
+(`Core/Model/Geometry.cs`), and every shape exists because a blocky stand-in looked wrong:
 
-- Axes: X width, Y depth, Z height. The family origin is the centre of its base at Z = 0; the front faces
-  negative Y.
-- **Tilt sign:** positive tilt swings the top of a part toward the front (-Y). A backrest leaning back
-  uses a negative tilt. Revit's `Transform.CreateRotationAtPoint(XYZ.BasisX, angle, centre)` matches.
-- 1 to 60 parts, unique names, materials from the brief, `ComponentId` only for sized components,
-  `IsFloorSupport` on the parts that stand on the floor.
-- The host computes the envelope from all eight transformed corners of every part
-  (`RecipeRules.Corners`); the model never returns an envelope.
+| Shape | Fields | For |
+| --- | --- | --- |
+| `box` | `MinM`, `MaxM`, `TiltDegrees`, `RadiusM` (edge rounding, 0 for crisp, at most half the smallest side) | Slabs, frames, panels; with a radius, cushions, mattresses, padded arms |
+| `cylinder` | `PointsM` (the two axis end centres), `RadiusM` at the first, `EndRadiusM` at the second | Splayed and tapered legs, posts, stretchers, round tops, drums, shades |
+| `sphere` | `PointsM[0]` (centre), `RadiusM` | Knobs, ball feet, finials, globes |
+| `tube` | `PointsM` (2 to 12 path points), `RadiusM`; rounded joints and ends | Bent metal and bentwood frames, arms, rails, piping |
+| `profile` | `Plane` (front XZ, side YZ, plan XY), `OutlineM` (3 to 32 [u, v] points), `RadiusM` (corner rounding), `FromM`..`ToM` along the remaining axis | Sculpted sides and arms, sled bases, curved shells and backs, shaped tops |
+
+- **Tilt sign** (boxes): positive tilt swings the top of a part toward the front (-Y). A backrest leaning
+  back uses a negative tilt. Revit's `Transform.CreateRotationAtPoint(XYZ.BasisX, angle, centre)` matches.
+- **Mirror:** `Mirror` adds the part's reflection across X = 0, named "<name> mirrored" (`Shapes.Expand`).
+  The model describes one side of a symmetric item; edits and patches always name the original.
+- **Settling:** round floor supports (cylinders, spheres, tubes) are moved up or down by at most their
+  radius so their lowest point is exactly at Z = 0 (`Shapes.Settle`). A splayed leg's tilted end disc
+  would otherwise dip a few millimetres below the floor.
+- At most 120 solids counting mirror copies, unique names (copies included), materials from the brief,
+  `ComponentId` only for sized components, `IsFloorSupport` on the parts that stand on the floor. Radii,
+  lengths and thicknesses are at least 2 mm; profile outlines may not cross themselves.
+- The host computes the envelope from the exact geometry of every part (`Shapes.Bounds`: tilted corners,
+  circle and arc extremes, rounded boxes as their core grown by the radius); the model never returns an
+  envelope. The same class provides contact points, support surfaces and the drawing mesh, so what is
+  checked is what gets built. `ShapesTests` compares every bound with dense independent sampling.
 
 | Check | Tolerance |
 | --- | --- |
@@ -62,7 +77,8 @@ tilted by `TiltDegrees` about its own X axis through its centre.
 | Preview room | X -4..4 m, Y -3..3 m, Z 0..4 m |
 
 Fidelity (`Core/Prompts/Fidelity.cs`) sets the detail target for planning, repair and review: Concept
-(4/10, 5 to 16 parts) or Refined (6/10, 12 to 32 parts).
+(4/10, 8 to 30 parts) or Refined (6/10, 20 to 70 parts). At both, blocky boxes standing in for round,
+tapered, curved or soft components are a silhouette problem, and the review reports them.
 
 ## Placement (collections)
 
@@ -73,7 +89,7 @@ detection. Rotation is degrees about world Z; zero faces -Y.
 | --- | --- |
 | `absolute` | `offsetM` is the world position, `rotationDegrees` the world rotation |
 | `relative` | Offset X/Y in the anchor's local axes, Z as a world elevation; rotation adds to the anchor's |
-| `surface` | Stand on `supportPartName`, a horizontal part of the anchor. Z is computed from that part's top |
+| `surface` | Stand on `supportPartName`, a level part of the anchor: a box's flat top (inside its edge rounding) or the largest square inside an upright cylinder's top. Z is computed from that top |
 | `mirror` | Mirror the referenced placement across world X or Y = `mirrorPlaneM` (position, not geometry) |
 
 `facingKey` or `facingPointM` aims an item's front at another placement or a point:
