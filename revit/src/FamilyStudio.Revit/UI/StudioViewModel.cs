@@ -88,7 +88,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
         _codex.StateChanged += OnBackgroundChange;
         _session.Changed += OnBackgroundChange;
-        LoadDraft(PresetDraft(Presets.SingleId)); // opens on the example chair (photo, name, size, finishes), ready to run
+        LoadDraft(PresetDraft(Presets.SingleId), Presets.Get(Presets.SingleId).Unit); // opens on the example roundel (photo, name, size, finish), ready to run
         Refresh();
     }
 
@@ -310,7 +310,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     /// <summary>The single item example's photo, copied next to the add-in by the build.</summary>
     private static readonly string ExamplePhoto = Path.Combine(
-        Path.GetDirectoryName(typeof(StudioViewModel).Assembly.Location)!, "Examples", "walnut-lounge-chair.jpg");
+        Path.GetDirectoryName(typeof(StudioViewModel).Assembly.Location)!, "Examples", "trident-roundle.jpg");
 
     /// <summary>A preset's inputs. The single item example also gets its photo when the file is there.</summary>
     private static StudioDraft PresetDraft(string presetId)
@@ -324,7 +324,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
         try
         {
             _session.StartNew(CurrentDraft(), presetId);
-            LoadDraft(draft ?? PresetDraft(presetId));
+            LoadDraft(draft ?? PresetDraft(presetId), draft is null ? Presets.Get(presetId).Unit : LengthUnit.Millimetres);
             CurrentSheet = Sheet.Brief;
             Refresh();
         }
@@ -457,7 +457,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
     private static string[] Notes(string text) =>
         text.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToArray();
 
-    private void LoadDraft(StudioDraft draft)
+    private void LoadDraft(StudioDraft draft, LengthUnit unit = LengthUnit.Millimetres)
     {
         _populating = true;
         try
@@ -467,10 +467,10 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
             _itemDescription = draft.IsSingleItem ? draft.Assets[0] : "";
             _materialNotes = draft.IsSingleItem ? string.Join("\n", draft.Materials) : "";
             _roomStyle = draft.IsSingleItem ? "" : draft.Style;
-            _unit = "mm";
-            _widthText = draft.KnownSizeM is null ? "" : Dimensions.Format(draft.KnownSizeM.X, LengthUnit.Millimetres);
-            _depthText = draft.KnownSizeM is null ? "" : Dimensions.Format(draft.KnownSizeM.Y, LengthUnit.Millimetres);
-            _heightText = draft.KnownSizeM is null ? "" : Dimensions.Format(draft.KnownSizeM.Z, LengthUnit.Millimetres);
+            _unit = Dimensions.Symbol(unit);
+            _widthText = draft.KnownSizeM is null ? "" : Dimensions.Format(draft.KnownSizeM.X, unit);
+            _depthText = draft.KnownSizeM is null ? "" : Dimensions.Format(draft.KnownSizeM.Y, unit);
+            _heightText = draft.KnownSizeM is null ? "" : Dimensions.Format(draft.KnownSizeM.Z, unit);
             ShowPhoto(draft.ReferenceImagePath is string photo && File.Exists(photo) ? photo : null);
 
             foreach (var item in Items) item.Changed -= DraftChanged;

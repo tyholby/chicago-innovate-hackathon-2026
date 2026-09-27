@@ -135,10 +135,10 @@ wrong hash is rejected as stale. An answer that is not valid JSON is asked for a
 
 `Core/Prompts/Presets.cs`: Single item, Blank collection, Executive office, Bedroom suite, Kitchen and
 Treatment bay. Choosing one only fills the inputs; nothing runs until the user asks. Single item is a
-complete example, the walnut lounge chair from a live run: one sentence of notes, the name, size
-(760 x 860 x 800 mm) and two finishes from that run's brief, and its reference image as the photo
-(`FamilyStudio.Revit/Examples/walnut-lounge-chair.jpg`, which the add-in adds). The window opens on it and
-switching to single items returns to it, while **New design** gives a blank sheet in either mode.
+complete example, the Trident Roundle from a live run: a stone bas-relief medallion with its notes, name,
+size (48 x 5 x 48 in, shown in inches because each preset carries its display unit) and one finish, and
+its photo (`FamilyStudio.Revit/Examples/trident-roundle.jpg`, which the add-in adds). The window opens on
+it and switching to single items returns to it, while **New design** gives a blank sheet in either mode.
 
 ## Changing prompts or output formats
 

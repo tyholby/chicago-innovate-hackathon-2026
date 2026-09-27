@@ -41,9 +41,10 @@ administrator rights are needed. `.\scripts\uninstall.ps1` removes the registrat
 
 ## Using it
 
-1. **Brief.** The window opens on a complete example, a walnut lounge chair with its photo,
-   name, size and finishes, so the whole flow can be tried straight away. For your own piece, click
-   **New design** for a blank sheet (or edit the example) and/or drop a product photo on the plate.
+1. **Brief.** The window opens on a complete example, the Trident Roundle (a stone bas-relief
+   medallion) with its photo, name, size and finish, so the whole flow can be tried straight away.
+   For your own piece, click **New design** for a blank sheet (or edit the example) and/or drop a
+   product photo on the plate.
    Add overall dimensions if you know them (650, 25.5 in or 2'-6" all work), or leave them blank and
    Family Studio proposes a size. Finishes are optional, one per line.
    For a room, choose *Collection of seven*, pick a starting point (office, bedroom suite, kitchen,

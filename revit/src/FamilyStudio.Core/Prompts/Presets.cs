@@ -2,7 +2,8 @@ using FamilyStudio.Core.Model;
 
 namespace FamilyStudio.Core.Prompts;
 
-public sealed record Preset(string Id, string Name, string Caption, StudioDraft Draft)
+/// <summary>A starting point. <c>Unit</c> is the unit its size is shown in.</summary>
+public sealed record Preset(string Id, string Name, string Caption, StudioDraft Draft, LengthUnit Unit = LengthUnit.Millimetres)
 {
     public override string ToString() => Name;
 }
@@ -12,15 +13,17 @@ public static class Presets
 {
     public const string SingleId = "single";
 
+    private const double Inch = 0.0254;
+
     public static IReadOnlyList<Preset> All { get; } = new[]
     {
-        // The window opens on this example, so it never starts blank: the walnut lounge chair from a live run,
-        // with that brief's name, size and finishes. The add-in adds its photo (Examples/walnut-lounge-chair.jpg).
-        // New design clears it.
+        // The window opens on this example, so it never starts blank: the stone roundel from a live run, with
+        // its name, size (measured in inches, and shown that way) and finish. The add-in adds its photo
+        // (Examples/trident-roundle.jpg). New design clears it.
         new Preset(SingleId, "Single item", "One piece from words or a photo", new StudioDraft("",
-            new[] { "A mid-century lounge chair: solid walnut frame with tapered legs, low slung seat and a reclined back, loose charcoal wool seat and back cushions, walnut armrests." },
-            new[] { "Solid walnut frame, legs and armrests", "Charcoal wool seat and back cushions" },
-            new[] { "Walnut Lounge Chair" }, KnownSizeM: new Vec3(0.76, 0.86, 0.80))),
+            new[] { "A detailed stone bas-relief medallion of a mythological sea god with a trident standing on a large fish, neoclassical architectural sculpture, weathered stone block wall, muted gray tones, historical atmosphere, soft natural lighting, straight-on angle, coarse texture, intricate details, high quality, realistic, no people, neutral lighting, high resolution, outdoor setting, background in focus, no blur, detailed textures." },
+            new[] { "Stone" },
+            new[] { "Trident Roundle" }, KnownSizeM: new Vec3(48 * Inch, 5 * Inch, 48 * Inch)), LengthUnit.Inches),
         new Preset("blank", "Blank collection", "Seven items, four materials", StudioDraft.EmptyCollection()),
         new Preset("office", "Executive office", "Desk, seating, storage, lamp, rug, planter", new StudioDraft(
             "A calm executive office. Warm walnut, charcoal leather, brushed bronze and ivory. Architectural, " +
@@ -88,11 +91,13 @@ public static class Presets
             new[] { "Patient stretcher", "Monitor cart", "Supply trolley", "Supply cabinet", "Clinician stool", "Visitor chair", "Examination light" }))
     };
 
+    /// <summary>The preset with this ID, or the single item example.</summary>
+    public static Preset Get(string id) => All.FirstOrDefault(p => p.Id == id) ?? All[0];
+
     /// <summary>A deep copy, so editing a draft never mutates the preset.</summary>
     public static StudioDraft Create(string id)
     {
-        var preset = All.FirstOrDefault(p => p.Id == id) ?? All[0];
-        var d = preset.Draft;
+        var d = Get(id).Draft;
         return d with { Assets = d.Assets.ToArray(), Materials = d.Materials.ToArray(), AssetNames = d.AssetNames.ToArray() };
     }
 }

@@ -56,7 +56,7 @@
 
   <!-- The single item example's photo, shown on the plate when the window opens. -->
   <ItemGroup>
-    <None Update="Examples\walnut-lounge-chair.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Examples\trident-roundle.jpg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
