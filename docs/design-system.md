@@ -50,6 +50,12 @@ and its status, then the one primary action. The header carries the mark and wor
 host or version line. A 1 px drafting line across its top edge
 carries a travelling ink stroke while Family Studio works.
 
+**View2Render** is a second window in the same system, as one sheet: a plate with **View** and
+**Render** segments (the capture, then the render), a schedule column (the view, the optional prompt,
+reference image thumbnails in a dashed drop zone, and the exact prompt sent), and the same title block
+with one primary action, **Render view**. While it renders, the view fades behind a card with the step,
+the time and a progress bar (`FS.Progress`); **Download** sits under the finished render.
+
 ## Tokens
 
 Two themes with identical keys. Contrast ratios are WCAG 2.x, text against the background and
@@ -121,6 +127,7 @@ on buttons or body text.
 | Finish chip | (template) | Swatch, `MT-01` code in figures, name, hex value |
 | Status stamp | (title block) | Preliminary, For review, Checked, Built, Issued, or Not issued in redline |
 | Drafting line | `ui:DraftingLine` | A hairline with a travelling ink stroke while work is in progress |
+| Progress bar | `FS.Progress` | 4 px, a cobalt fill on a hairline-coloured track, square ends, with the percentage in figures beside it. Only for steps that can say how far they are |
 | Issue register | (popup) | Time, event and duration of every step, errors in redline |
 
 ## Motion and states

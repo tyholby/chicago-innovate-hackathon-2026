@@ -42,33 +42,48 @@ public static class ReferenceImages
 
     public static ReferenceImage ImportUpload(string path, SessionJournal journal)
     {
-        var size = InspectUpload(path);
-        var bytes = File.ReadAllBytes(path);
-        var extension = System.IO.Path.GetExtension(path).ToLowerInvariant() == ".png" ? ".png" : ".jpg";
-        var destination = journal.PathFor($"reference-upload-{Guid.NewGuid():N}"[..27] + extension);
-        File.WriteAllBytes(destination, bytes);
-        var reference = new ReferenceImage(ReferenceImage.Upload, destination, StudioJson.Sha256(bytes), size.Width, size.Height,
+        var copy = CopyUpload(path, journal, $"reference-upload-{Guid.NewGuid():N}"[..27]);
+        var reference = new ReferenceImage(ReferenceImage.Upload, copy.Path, copy.Sha256, copy.Size.Width, copy.Size.Height,
             System.IO.Path.GetFileName(path), null);
         journal.Write("reference_imported", new { reference.Sha256, reference.Width, reference.Height });
         return reference;
     }
 
+    /// <summary>Checks a photo the user picked and copies it into the session folder as <paramref name="stem"/> plus its extension.</summary>
+    public static (string Path, string Sha256, ImageSize Size) CopyUpload(string path, SessionJournal journal, string stem)
+    {
+        var size = InspectUpload(path);
+        var bytes = File.ReadAllBytes(path);
+        var destination = journal.PathFor(stem + (System.IO.Path.GetExtension(path).ToLowerInvariant() == ".png" ? ".png" : ".jpg"));
+        File.WriteAllBytes(destination, bytes);
+        return (destination, StudioJson.Sha256(bytes), size);
+    }
+
     public static ReferenceImage ImportGenerated(StageResult stage, SessionJournal journal)
     {
         var image = stage.Image ?? throw new StudioProtocolException("The reference step returned no image.");
-        var info = new FileInfo(image.SavedPath);
-        if (!info.Exists || info.Length == 0 || info.Length > 64L * 1024 * 1024)
-            throw new StudioProtocolException("The generated reference image is missing or has an unexpected size.");
-        var bytes = File.ReadAllBytes(image.SavedPath);
-        var size = Measure(bytes) ?? throw new StudioProtocolException("The generated reference is not a PNG or JPEG image.");
-        if (size.Width < 256 || size.Height < 256)
-            throw new StudioProtocolException("The generated reference is too small to read. Generate it again.");
-        var extension = bytes[0] == 0xFF ? ".jpg" : ".png";
-        var destination = journal.PathFor($"reference-generated-{stage.StageId}{extension}");
-        File.WriteAllBytes(destination, bytes);
-        var reference = new ReferenceImage(ReferenceImage.Generated, destination, StudioJson.Sha256(bytes), size.Width, size.Height, null, image.RevisedPrompt);
+        var copy = SaveGenerated(image, journal, $"reference-generated-{stage.StageId}", "reference");
+        var reference = new ReferenceImage(ReferenceImage.Generated, copy.Path, copy.Sha256, copy.Size.Width, copy.Size.Height, null, image.RevisedPrompt);
         journal.Write("reference_generated", new { stage.StageId, reference.Sha256, reference.Width, reference.Height });
         return reference;
+    }
+
+    /// <summary>
+    /// Checks an image Codex generated and copies it into the session folder as <paramref name="stem"/>
+    /// plus its own extension. <paramref name="noun"/> names it in errors ("reference", "render").
+    /// </summary>
+    public static (string Path, string Sha256, ImageSize Size) SaveGenerated(GeneratedImage image, SessionJournal journal, string stem, string noun)
+    {
+        var info = new FileInfo(image.SavedPath);
+        if (!info.Exists || info.Length == 0 || info.Length > 64L * 1024 * 1024)
+            throw new StudioProtocolException($"The generated {noun} image is missing or has an unexpected size.");
+        var bytes = File.ReadAllBytes(image.SavedPath);
+        var size = Measure(bytes) ?? throw new StudioProtocolException($"The generated {noun} is not a PNG or JPEG image.");
+        if (size.Width < 256 || size.Height < 256)
+            throw new StudioProtocolException($"The generated {noun} is too small to use. Try again.");
+        var destination = journal.PathFor(stem + (bytes[0] == 0xFF ? ".jpg" : ".png"));
+        File.WriteAllBytes(destination, bytes);
+        return (destination, StudioJson.Sha256(bytes), size);
     }
 
     /// <summary>Reads pixel dimensions from PNG or JPEG bytes, or returns null for anything else.</summary>

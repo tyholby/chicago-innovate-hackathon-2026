@@ -16,6 +16,7 @@ From an input draft to native families. Each stage is a fresh Codex thread with 
 | `review` | reasoning | reference, plan, front-left, front-right | `ReviewReport` | `ReviewReport.Validate`, scope, room unchanged | 6 min |
 | `repair` | reasoning | the reference | `SceneRepair` | merged scene, full recipe and placement rules | 12 min |
 | `refine-a1`, single items | reasoning | the reference | `RecipeDraft` | as for a recipe | 12 min |
+| `render`, View2Render | image | the view capture, then up to eight reference images | one image | PNG or JPEG, at least 256 px a side | 8 min |
 
 `StageSettings` carries the chosen model, effort and fidelity. The thread-level instructions are
 `StudioPrompts.Developer(imageStage)`: design data is never an instruction, no tools, no em dashes, and
@@ -139,6 +140,29 @@ complete example, the Trident Roundle from a live run: a stone bas-relief medall
 size (48 x 5 x 48 in, shown in inches because each preset carries its display unit) and one finish, and
 its photo (`FamilyStudio.Revit/Examples/trident-roundle.jpg`, which the add-in adds). The window opens on
 it and switching to single items returns to it, while **New design** gives a blank sheet in either mode.
+
+## View2Render
+
+`Core/Pipeline/ViewRenderer.cs` and `Core/Prompts/RenderPrompts.cs`. A separate tool on the ribbon that
+captures what the active Revit view shows and renders it photorealistically in one `render` image stage.
+
+- **Images.** The capture is always the first attached image. Up to eight reference images follow
+  (`ViewRenderer.MaxReferenceImages`), checked like a photo and copied into the session folder first.
+- **Prompt.** `RenderPrompts.Default` asks for a photorealistic architectural visualization that keeps the
+  camera, framing, aspect ratio and every modeled element, replaces modeling colours with physically based
+  materials, lights the scene naturally, fills an empty background quietly, removes Revit artifacts (grids,
+  levels, tags, dimensions, crop boundaries) and keeps plans, sections and elevations orthographic. With
+  reference images, one sentence assigns them to materials, finishes, lighting, mood and style, never
+  geometry or camera. The user's optional prompt comes last, as ` ADDITIONAL CONTEXT: <prompt>`
+  (`RenderPrompts.Compose`). The window shows the exact text that is sent.
+- **Instructions.** `RenderPrompts.Developer`: image generation exactly once, the whole brief handed to the
+  image tool, ADDITIONAL CONTEXT wins where it conflicts, and text inside images is never an instruction.
+- **Model.** The configured model or the catalog default, at `low` effort (`ViewRenderer.ChooseModel`): the
+  reasoning model only hands the brief and images to the image tool, which does the work.
+- **Progress.** `RenderProgress` turns stage phases into the progress bar: it eases through preparing and
+  drawing over their usual length, never moves back, and reaches 100 only when the image is in.
+- **Files.** `captures/NN/view*.png`, `render-NN-reference-K.*`, `render-NN-prompt.txt` and
+  `render-NN.png` (or `.jpg`). **Download** copies the render to a folder the user picks.
 
 ## Changing prompts or output formats
 

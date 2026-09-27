@@ -55,7 +55,13 @@ dictionaries loaded by pack URI are the first thing to test if that is ever turn
   `ThemeChanged`. Only `ThemeType.UITheme` changes are forwarded, as `App.UiThemeChanged`.
 - `OpenStudioCommand` (`TransactionMode.Manual`) calls `StudioLauncher.Open`. The command context is the
   only place the `ExternalEvent` behind `RevitDispatcher` can be created.
-- `App.OnShutdown` closes the window immediately, which stops both Codex processes.
+- A **Render** panel holds **View2Render** (`ViewToRenderCommand`, icon `RibbonIcon.RenderView`), enabled
+  only while a document is open (`ViewToRenderAvailability`). `RenderLauncher.Open` captures the active view
+  in the command's context with `ViewCapturer`: `Document.ExportImage` with
+  `ExportRange.VisibleRegionOfCurrentView`, 2048 px wide, PNG, into a fresh `captures/NN/` folder (Revit may
+  add the view name to the file name). 3D views, plans, sections, elevations, detail views, walkthroughs
+  and renderings can be captured; sheets, schedules, legends and drafting views are refused with a message.
+- `App.OnShutdown` closes both windows immediately, which stops their Codex processes.
 - `ThemeManager` reads `UIThemeManager.CurrentTheme` (Revit 2024 and later) and swaps `Paper.xaml` or
   `Night.xaml` into the window's merged dictionaries at index 0.
 
@@ -165,8 +171,11 @@ touching the session's preview room state.
 ## Not yet verified in Revit
 
 Everything in this project compiles against the Revit 2025, 2026 and 2027 API, and the whole pipeline
-runs outside Revit through the probe. The add-in itself has not yet been run inside Revit. On the first
-Windows run, check in particular: the ribbon icon and the window in both Revit themes, sign-in from the
-window, template discovery on non-English installs, the preview room and its views, image export file
-names, loading into a project with a clashing family name, and closing the preview room while a build
-is queued. Record what you find in [status-and-decisions.md](status-and-decisions.md).
+runs outside Revit through the probe. The add-in has run in Revit 2027 (see
+[status-and-decisions.md](status-and-decisions.md) for exactly what). Still to check there: the window in
+both Revit themes, template discovery on non-English installs, loading into a project with a clashing
+family name, and closing the preview room while a build is queued. For View2Render: the ribbon button
+and its disabled state with no document open, the capture of each view type (and the exported file
+name), the render with and without reference images, progress, cancel, download, and pressing the
+button again while the window is open. Record what you find in
+[status-and-decisions.md](status-and-decisions.md).

@@ -7,7 +7,8 @@ area you are changing.
 
 **Family Studio** turns a description or a product photo into a native Revit furniture family. It
 runs on the user's ChatGPT plan through OpenAI's Codex app-server ("Sign in with ChatGPT"); there are
-no API keys. `revit/` is the working product (single items and seven-item collections). `rhino/` is a
+no API keys. `revit/` is the working product (single items and seven-item collections), plus
+View2Render, which renders the active Revit view photorealistically with ChatGPT image generation. `rhino/` is a
 Rhino 8 scaffold that shows a hello-world panel in the same design language.
 
 ## Map

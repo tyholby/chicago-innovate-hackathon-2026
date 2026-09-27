@@ -930,27 +930,7 @@ public sealed class StudioViewModel : ObservableObject, IDisposable
 
     // ---- helpers -----------------------------------------------------------------------------
 
-    /// <summary>
-    /// Loads an image fully into memory, so the file is never locked while shown. Large photos are
-    /// decoded at display size: a 40-megapixel photo would otherwise cost about 160 MB each time.
-    /// </summary>
-    private static ImageSource? LoadImage(string path)
-    {
-        const int maxWidth = 1600;
-        try
-        {
-            var bytes = File.ReadAllBytes(path);
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            if (ReferenceImages.Measure(bytes) is { Width: > maxWidth }) image.DecodePixelWidth = maxWidth;
-            image.StreamSource = new MemoryStream(bytes);
-            image.EndInit();
-            image.Freeze();
-            return image;
-        }
-        catch (Exception) { return null; }
-    }
+    private static ImageSource? LoadImage(string path) => Files.LoadImage(path, maxWidth: 1600);
 
     private static void OpenUrl(string url)
     {

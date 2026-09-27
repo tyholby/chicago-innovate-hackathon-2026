@@ -48,7 +48,7 @@ following [local-install.md](local-install.md):
   model used every shape (18 cylinders, 18 profiles, 17 tubes, 6 spheres, 1 box; 60 parts), the recipe
   passed validation on the first attempt and Revit built it. `shape_fallbacks` kept two drapery folds as
   11 and 9 overlapping solids because Revit could not unite them.
-- `dotnet test` passes (106 tests, run on the .NET 10 runtime); the add-in builds for 2025 and 2026 with
+- `dotnet test` passes (114 tests, run on the .NET 10 runtime); the add-in builds for 2025 and 2026 with
   zero warnings and for 2027 with the 2 MSB3277 above; the probe and the Rhino plug-in build.
 
 ### Performance (2026-09-26)
@@ -60,19 +60,25 @@ output tokens: reasoning plus answer. Revit's own work (preview room, build, cap
 | --- | --- | --- | --- |
 | Example chair, boxes only, `xhigh` | 42 s | 3.4 min | 4,860 + 1,738 |
 | Stone relief, curved shapes, Refined, `xhigh`, 60 parts | 42 s | 14.7 min | 15,020 + 14,198 |
+| The same photo, prompts version 3, Concept, `xhigh`, 27 parts | 44 s | 7.5 min | 11,122 + 3,867 |
 
 About a third of that relief answer was field names (every part listed all 15 fields) and 28 percent was
 indentation. Prompts version 3 lists only each shape's fields and asks for compact JSON: rewritten that
-way, the same answer is half the size (35.0k to 17.7k characters). Reasoning at `xhigh` is the other half
-of the time; the effort is a setting (see [codex-integration.md](codex-integration.md)).
+way, the same answer is half the size (35.0k to 17.7k characters). Its first live run (the third row)
+answered in one compact line, passed validation on the first attempt, and was about 40 percent smaller
+per part. Reasoning at `xhigh` is most of the rest, which is why new windows now start at `low` (see
+[codex-integration.md](codex-integration.md)).
 
 ### Not verified yet
 
-- **Prompts version 3, and parallel planning, live.** Per-shape part fields, `[x, y, z]` points and
-  compact answers pass every offline test but have had no live run: check that answers come back compact
-  (the `<stage>-<id>-output.txt` files) and that validation passes as often as before. A collection's
-  parallel recipes run several Codex threads in one app-server process; confirm that on a first live
-  collection, and watch for rate limits.
+- **Parallel planning, live.** A collection's parallel recipes run several Codex threads in one app-server
+  process; confirm that on a first live collection, and watch for rate limits. Prompts version 3 is
+  verified on one single item (above).
+- **View2Render.** It builds for every Revit year and its core (prompt, reference images, progress) has
+  unit tests, but it has not run in Revit or live: the capture of each view type, the render through
+  Codex's image tool with and without reference images, progress, cancel and download. The checklist is
+  in [revit-integration.md](revit-integration.md). The probe's `render` command runs the render stage
+  without Revit.
 - **The curved shapes in Revit beyond one run** (above): check the session log for `shape_fallbacks`.
 
 - **The rest of the Revit checklist, and anything in Rhino.** In Revit, not yet run: review and repair,
@@ -128,6 +134,8 @@ preview room document, and everything in the checklist in [revit-integration.md]
 | Geometry uses five shapes: boxes with rounded edges, cylinders and tapers on any axis, spheres, tubes and extruded profiles, with mirroring (2026-09-26) | Boxes alone made every item look blocky. Each shape still has exact bounds in code and is built only from extrusions and revolutions, so validation and the measure-back stay exact |
 | A recipe part lists only its shape's fields, points are `[x, y, z]`, and answers are compact JSON with lengths to whole millimetres (prompts version 3) | Output tokens are most of a stage's time; a recorded 60-part answer halves |
 | A collection plans up to four recipes at once, each in its own Codex thread | Seven recipes in a row took seven times one recipe; each is independent until the layout |
+| View2Render renders through Codex image generation at `low` effort, with up to eight reference images (2026-09-26) | The same ChatGPT sign-in and no API key. Codex picks the image model (the protocol has no setting for it), and the reasoning step only hands the brief and images to the image tool |
+| New windows start at `low` reasoning effort, not `xhigh` (2026-09-26) | A stage's time is its output tokens, and `xhigh` reasoning was most of them: an item took minutes. Higher efforts stay one click away in Settings, and `OPENAI_CODEX_REASONING_EFFORT` still sets a default |
 | Every running stage shows live progress on the detail line | A 15-minute step behind a static status looks like a hang |
 | Every design builds in its own preview room | The user's model changes only when they choose **Load into project**, and their families are never overwritten |
 | One family type, named by the accepted size | Rebuilt revisions reload in place without new types |

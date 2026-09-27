@@ -65,10 +65,19 @@ administrator rights are needed. `.\scripts\uninstall.ps1` removes the registrat
 Every step can be cancelled; finished work is always kept. Ctrl+Enter runs the main action.
 The window follows Revit's light or dark theme.
 
+### View2Render
+
+**View2Render**, next to Family Studio on the ribbon, renders the active view as a photorealistic
+image. It captures what the view shows, so frame it first (a shaded or realistic 3D view works best).
+Add an optional prompt ("golden hour light, oak floors") and up to eight reference images for
+materials, lighting and style, then click **Render view**. A progress bar follows the render, which
+usually takes one to two minutes, and **Download** saves the result. After changing the view, click
+the ribbon button again or **Capture the active view again**.
+
 ### What gets sent where
 
 Your descriptions, photos and the preview-room views are sent to OpenAI, through Codex, under your
-ChatGPT account. Everything Family Studio produces stays on this computer, in a session folder under
+ChatGPT account, and so are View2Render's view captures, reference images and prompts. Everything Family Studio produces stays on this computer, in a session folder under
 `%LOCALAPPDATA%\FamilyStudio\sessions`: the brief, the reference image, every family revision (.rfa),
 the preview room (.rvt), view captures and an `events.jsonl` log. **Open session folder** in the
 settings menu goes straight there.
@@ -144,6 +153,7 @@ dotnet run --project tools/FamilyStudio.Probe -- signin
 dotnet run --project tools/FamilyStudio.Probe -- single "A walnut lounge chair with charcoal wool cushions" --effort medium
 dotnet run --project tools/FamilyStudio.Probe -- single "Side table" --size 500x500x550
 dotnet run --project tools/FamilyStudio.Probe -- collection bedroom
+dotnet run --project tools/FamilyStudio.Probe -- render view.png --prompt "golden hour light" --references "oak.jpg;sky.jpg"
 ```
 
 Revit locks the add-in DLL while it is loaded, so close Revit before rebuilding. A new `.addin`

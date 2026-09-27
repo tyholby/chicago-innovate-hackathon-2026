@@ -15,13 +15,15 @@ using FamilyStudio.Probe;
 //   single "<description>"          Brief, reference image and geometry for one item
 //        [--photo file] [--size 650x700x850] [--unit mm|in] [--name text] [--materials "a;b"]
 //   collection <preset>             The same for a seven-item collection, plus layout
+//   render <view.png>               View2Render on an exported view image
+//        [--prompt text] [--references "a.jpg;b.png"]
 //
 // Common options: --env <file>  --model <id>  --effort <level>  --fidelity concept|refined
 
 var options = Options.Parse(args);
 if (options.Command is null or "help" or "--help")
 {
-    Console.WriteLine("usage: familystudio-probe status | signin [--device] | signout | single \"<description>\" [options] | collection <preset>");
+    Console.WriteLine("usage: familystudio-probe status | signin [--device] | signout | single \"<description>\" [options] | collection <preset> | render <view.png> [options]");
     Console.WriteLine("presets: " + string.Join(", ", Presets.All.Where(p => p.Id != Presets.SingleId).Select(p => p.Id)));
     return 1;
 }
@@ -70,6 +72,10 @@ switch (options.Command)
     case "collection":
         if (codex.Account is null) { Console.WriteLine("Sign in first: familystudio-probe signin"); return 2; }
         return await RunDesignAsync(codex, environment, options, cancel.Token);
+
+    case "render":
+        if (codex.Account is null) { Console.WriteLine("Sign in first: familystudio-probe signin"); return 2; }
+        return await RenderViewAsync(codex, environment, options, cancel.Token);
 
     default:
         Console.WriteLine($"Unknown command {options.Command}.");
@@ -130,6 +136,45 @@ static async Task<int> RunDesignAsync(CodexService codex, StudioEnvironment envi
     File.WriteAllText(room, AxonometricSvg.Render(host.Instances.Select(i => (i.Recipe, i.Placement)).ToArray(), session.Brief, session.Brief.Title));
     Console.WriteLine($"Room         {room}");
     return Report(session, 0);
+}
+
+static async Task<int> RenderViewAsync(CodexService codex, StudioEnvironment environment, Options options, CancellationToken token)
+{
+    if (options.Positional is not string image || !File.Exists(image))
+    {
+        Console.WriteLine("usage: familystudio-probe render <view.png> [--prompt text] [--references \"a.jpg;b.png\"]");
+        return 1;
+    }
+    var view = Path.GetFullPath(image);
+    var size = ReferenceImages.InspectUpload(view);
+    var references = options.Get("references")?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Path.GetFullPath).ToArray()
+        ?? Array.Empty<string>();
+    var model = options.Get("model") is string id ? new ModelChoice(id, options.Get("effort") ?? "low") : ViewRenderer.ChooseModel(codex.Models, environment.PreferredModel);
+    var journal = SessionJournal.CreateUnder(environment.OutputRoot);
+    codex.Journal = journal;
+    Console.WriteLine($"Session      {journal.DirectoryPath}");
+    Console.WriteLine($"Model        {model}  references {references.Length}");
+
+    var progress = new RenderProgress();
+    progress.Reset();
+    var watch = Stopwatch.StartNew();
+    string? last = null;
+    codex.Progress += p =>
+    {
+        lock (progress)
+        {
+            progress.Update(p);
+            var line = $"{progress.Percent,3:0} %  {progress.Text}";
+            if (line == last) return;
+            last = line;
+            Console.WriteLine($"[{watch.Elapsed:mm\\:ss}] {line}");
+        }
+    };
+    var capture = new ViewCapture(view, Path.GetFileNameWithoutExtension(view), "Image", "Probe", size.Width, size.Height);
+    var render = await new ViewRenderer(codex, journal).RenderAsync(capture, options.Get("prompt"), references, model, token);
+    Console.WriteLine($"Render       {render.Path}  {render.Width} x {render.Height}  ({render.Elapsed.TotalSeconds:0} s)");
+    if (render.Usage is { } usage) Console.WriteLine($"Tokens       input {usage.InputTokens}  output {usage.OutputTokens}");
+    return 0;
 }
 
 static int Report(StudioSession session, int code)

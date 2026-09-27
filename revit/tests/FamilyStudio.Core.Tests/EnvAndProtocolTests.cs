@@ -139,9 +139,9 @@ public class VersionAndImageTests
 public class EffortTests
 {
     [Theory]
-    [InlineData(new[] { "low", "medium", "high", "xhigh" }, "medium", "xhigh")]
-    [InlineData(new[] { "low", "medium", "high" }, "medium", "high")]
-    [InlineData(new[] { "minimal", "low" }, "low", "low")]
-    public void Starts_on_xhigh_then_high_then_the_model_default(string[] efforts, string modelDefault, string expected) =>
+    [InlineData(new[] { "low", "medium", "high", "xhigh" }, "medium", "low")]
+    [InlineData(new[] { "minimal", "low", "medium" }, "medium", "low")]
+    [InlineData(new[] { "medium", "high" }, "high", "high")]
+    public void Starts_on_low_then_the_model_default(string[] efforts, string modelDefault, string expected) =>
         Assert.Equal(expected, CodexModel.StartingEffort(efforts, modelDefault));
 }

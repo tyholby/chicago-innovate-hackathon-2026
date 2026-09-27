@@ -566,6 +566,25 @@
         </Setter>
     </Style>
 
+    <!-- Progress: a cobalt bar on a hairline track, square ends, for steps that report how far they are. -->
+    <Style x:Key="FS.Progress" TargetType="ProgressBar">
+        <Setter Property="Height" Value="4"/>
+        <Setter Property="Minimum" Value="0"/>
+        <Setter Property="Maximum" Value="100"/>
+        <Setter Property="Foreground" Value="{DynamicResource FS.Accent}"/>
+        <Setter Property="Background" Value="{DynamicResource FS.Rule}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}"/>
+                        <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Grid reference bubble: a circle with a number, the only round shape in the system. -->
     <Style x:Key="FS.Bubble" TargetType="ContentControl">
         <Setter Property="Width" Value="24"/>

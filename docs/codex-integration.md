@@ -39,7 +39,7 @@ supported.
 | Profile | Used by | Image generation | Code mode |
 | --- | --- | --- | --- |
 | `Reasoning` | Brief, recipe, layout, review, repair, refine | off | off |
-| `Image` | The reference image | on | on |
+| `Image` | The reference image, and View2Render renders | on | on |
 
 Launch (`CodexProcess.Arguments`):
 
@@ -78,8 +78,9 @@ process dies, the last lines of its stderr are included in the error.
 - `account/read {refreshToken:false}`: signed in only when `account.type == "chatgpt"`.
 - `model/list` (paged): Family Studio offers models that are not hidden and accept image input, default
   first. Effort levels come from each model's `supportedReasoningEfforts`. The view model picks
-  `OPENAI_CODEX_MODEL` / `OPENAI_CODEX_REASONING_EFFORT` when set, otherwise the catalog default at "xhigh"
-  (then "high", then the model's own default, for models without it: `CodexModel.StartingEffort`).
+  `OPENAI_CODEX_MODEL` / `OPENAI_CODEX_REASONING_EFFORT` when set, otherwise the catalog default at "low"
+  (or the model's own default, for models without it: `CodexModel.StartingEffort`). Higher efforts are one
+  click away in the settings menu.
 - Sign in: `account/login/start` with `{type:"chatgpt"}` returns `authUrl` (opened in the browser;
   Codex listens on localhost for the callback) or with `{type:"chatgptDeviceCode"}` returns
   `verificationUrl` and `userCode`. Completion arrives as the `account/login/completed` notification.
@@ -123,6 +124,12 @@ the request's `CountKey` has appeared (`"shape"`, once per recipe part; `"key"`,
 session shows it on the detail line ("Writing, 23 parts so far (4:10)"; one entry per item while a
 collection plans in parallel). Reports are never journaled, and an exception in a listener is swallowed,
 because they run on timer and protocol threads.
+
+**The image model.** Codex's hosted image tool chooses it, and the protocol has no setting for it: the
+`imageGeneration` item carries `status`, `savedPath`, `revisedPrompt` and `failure`, not a model name
+(checked against the Codex 0.157.1 schema). OpenAI says ChatGPT Images 2.5 serves Codex users, but Family
+Studio can neither pin that nor show which model drew an image. Input images go in as `localImage`
+items: View2Render sends the view capture first, then the reference images.
 
 A deadline or a cancel sends `turn/interrupt` (10 s grace). Errors map to: `usageLimitExceeded` or
 `rateLimitExceeded` to `StudioLimitException` (with the reset time when reported), `unauthorized` to

@@ -38,6 +38,10 @@ for the Codex protocol see [codex-integration.md](codex-integration.md); for Rev
 | `FamilyBuilder` | `Native/FamilyBuilder.cs` | Recipe to `.rfa`, with measure-back verification |
 | `StudioEnvironment` | `Core/Config/StudioEnvironment.cs` | Settings from environment variables and `.env` files |
 | `SessionJournal` | `Core/Pipeline/SessionJournal.cs` | Session folder: `events.jsonl` log and named artifacts |
+| `RenderLauncher`, `ViewToRenderCommand` | `FamilyStudio.Revit/RenderLauncher.cs`, `App.cs` | View2Render: one window per Revit session with its own Codex connection and session folder; the ribbon button captures the active view |
+| `RenderWindow`, `RenderViewModel` | `UI/RenderWindow.xaml(.cs)`, `UI/RenderViewModel.cs` | The view and render plate, prompt, reference images, progress bar and download |
+| `ViewCapturer` | `Native/ViewCapturer.cs` | Exports the visible region of the active view, in Revit's API context |
+| `ViewRenderer`, `RenderProgress` | `Core/Pipeline/ViewRenderer.cs` | The render stage and its files, and the progress bar's value |
 
 The core never references Revit. Everything Revit-specific sits behind `IStudioHost`
 (`Core/Pipeline/IStudioHost.cs`), which is why the probe and the tests can run the whole pipeline with
@@ -64,6 +68,12 @@ in-memory hosts.
 5. `App.OnShutdown` closes the window without asking and releases the host right there, because Revit
    runs no external events while it shuts down. If Revit crashes instead, each app-server still exits:
    `codex app-server` stops when its standard input closes.
+
+**View2Render** lives beside this, on the same tab. `ViewToRenderCommand` calls `RenderLauncher.Open`,
+which captures the active view right there (the command's API context) and opens the View2Render window,
+or brings it forward with the new capture. The window has its own `CodexService` (the same Codex home, so
+the same sign-in) and session folder, and its **Capture the active view again** button goes through its
+own `RevitDispatcher`. Closing the window stops its Codex processes; `App.OnShutdown` closes it too.
 
 ## Threading
 
@@ -131,6 +141,10 @@ The view model's primary button follows the session, not the state name: sign in
 | `families/preview-N/<assetId>/revision-NN/<Family name>.rfa` | Every family revision, per preview room |
 | `preview-rooms/Family Studio preview N.rvt` | The preview room of each accepted design |
 | `captures/NN/<view>/*.png` | Plan, front-left and front-right exports |
+
+A View2Render window gets a session folder of its own, with `captures/NN/view*.png` (each capture of the
+active view), `render-NN-prompt.txt`, `render-NN-reference-K.*` (copies of the reference images) and
+`render-NN.png` or `.jpg`, next to its `events.jsonl`.
 
 ## Settings
 

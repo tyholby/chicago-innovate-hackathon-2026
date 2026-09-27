@@ -5,7 +5,7 @@ using Autodesk.Revit.UI.Events;
 
 namespace FamilyStudio.Revit;
 
-/// <summary>Adds the Family Studio tab and follows Revit's light or dark UI theme.</summary>
+/// <summary>Adds the Family Studio tab (Family Studio and View2Render) and follows Revit's light or dark UI theme.</summary>
 public sealed class App : IExternalApplication
 {
     public const string TabName = "Family Studio";
@@ -28,6 +28,17 @@ public sealed class App : IExternalApplication
             LargeImage = RibbonIcon.Render(32)
         };
         panel.AddItem(button);
+
+        var render = application.CreateRibbonPanel(TabName, "Render");
+        render.AddItem(new PushButtonData("FamilyStudioView2Render", "View2Render", typeof(App).Assembly.Location, typeof(ViewToRenderCommand).FullName)
+        {
+            ToolTip = "Render the active view as a photorealistic image with ChatGPT.",
+            LongDescription = "Captures what the active view shows. Add an optional prompt and reference images, then ChatGPT image " +
+                              "generation renders it photorealistically, and you can download the result. Signs in with ChatGPT.",
+            Image = RibbonIcon.RenderView(16),
+            LargeImage = RibbonIcon.RenderView(32),
+            AvailabilityClassName = typeof(ViewToRenderAvailability).FullName
+        });
         application.ThemeChanged += OnThemeChanged;
         return Result.Succeeded;
     }
@@ -36,6 +47,7 @@ public sealed class App : IExternalApplication
     {
         application.ThemeChanged -= OnThemeChanged;
         StudioLauncher.Shutdown();
+        RenderLauncher.Shutdown();
         return Result.Succeeded;
     }
 
@@ -62,4 +74,29 @@ public sealed class OpenStudioCommand : IExternalCommand
             return Result.Failed;
         }
     }
+}
+
+/// <summary>View2Render: captures the active view and opens (or brings forward) the render window.</summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class ViewToRenderCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+    {
+        try
+        {
+            RenderLauncher.Open(commandData.Application);
+            return Result.Succeeded;
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+            return Result.Failed;
+        }
+    }
+}
+
+/// <summary>View2Render needs an open document with a view to capture.</summary>
+public sealed class ViewToRenderAvailability : IExternalCommandAvailability
+{
+    public bool IsCommandAvailable(UIApplication applicationData, CategorySet selectedCategories) => applicationData.ActiveUIDocument is not null;
 }
